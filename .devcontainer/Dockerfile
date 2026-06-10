@@ -13,7 +13,18 @@ WORKDIR /workspace
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Create venv
+RUN python -m venv /app/venv
+
+# Activate venv + install deps
+RUN /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# Copy rest of code
+COPY . .
+
+# Use venv by default
+ENV PATH="/app/venv/bin:$PATH"
 
 # Expose FastAPI port
 EXPOSE 8000
