@@ -5,6 +5,7 @@ openai
 langchain
 pypdf2
 pdfplumber
+pytest
 python-docx
 docx2txt
 jupyterlab
