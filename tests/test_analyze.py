@@ -20,6 +20,18 @@ def test_analyze_endpoint():
     assert isinstance(data["analysis"]["matched_skills"], list)
     assert isinstance(data["analysis"]["missing_skills"], list)
     assert isinstance(data["analysis"]["alignment_score"], float)
-    assert data["improvements"]["rewritten_summary"] == ""
+    assert isinstance(data["analysis"]["resume_keyword_count"], int)
+    assert isinstance(data["analysis"]["job_keyword_count"], int)
+    assert isinstance(data["analysis"]["supplemental_keyword_count"], int)
+    assert isinstance(data["analysis"]["supplemental_used"], bool)
+    assert data["improvements"]["rewritten_summary"]
     assert data["improvements"]["rewritten_bullets"] == []
-    assert data["improvements"]["explanations"] == [] 
+    assert data["improvements"]["explanations"]
+
+
+def test_root_serves_frontend():
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Resume AI" in response.text

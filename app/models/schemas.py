@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 class AnalyzeRequest(BaseModel):
     resume_text: str = Field(..., min_length=1)
@@ -10,6 +11,10 @@ class AnalysisResult(BaseModel):
     matched_skills: List[str]
     missing_skills: List[str]
     alignment_score: float
+    resume_keyword_count: int
+    job_keyword_count: int
+    supplemental_keyword_count: int
+    supplemental_used: bool
 
 class ImprovementResult(BaseModel):
     rewritten_summary: str = ""
