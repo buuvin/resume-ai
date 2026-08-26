@@ -4,7 +4,9 @@ const statusPill = document.getElementById("status-pill");
 const submitButton = form.querySelector("button[type='submit']");
 const resumeFileInput = document.getElementById("resume-file");
 const resumeTextArea = document.getElementById("resume-text");
+const jobDescFileInput = document.getElementById("job-desc-file");
 const jobTextArea = document.getElementById("job-text");
+const contextFileInput = document.getElementById("context-file");
 const supplementalTextArea = document.getElementById("supplemental-text");
 
 function escapeHtml(value) {
@@ -86,37 +88,59 @@ function renderError(message) {
   setStatus("error", "Request failed");
 }
 
-resumeFileInput.addEventListener("change", async () => {
+resumeFileInput.addEventListener("change", () => {
   const file = resumeFileInput.files && resumeFileInput.files[0];
 
   if (!file) {
     return;
   }
 
-  const text = await file.text();
-  resumeTextArea.value = text.trim();
-  setStatus("idle", `Loaded ${file.name}`);
+  setStatus("idle", `Selected ${file.name}`);
+});
+
+jobDescFileInput.addEventListener("change", () => {
+  const file = jobDescFileInput.files && jobDescFileInput.files[0];
+
+  if (!file) {
+    return;
+  }
+
+  setStatus("idle", `Selected ${file.name}`);
+});
+
+contextFileInput.addEventListener("change", () => {
+  const file = contextFileInput.files && contextFileInput.files[0];
+
+  if (!file) {
+    return;
+  }
+
+  setStatus("idle", `Selected ${file.name}`);
 });
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  const payload = {
-    resume_text: resumeTextArea.value.trim(),
-    job_description_text: jobTextArea.value.trim(),
-    supplemental_text: supplementalTextArea.value.trim(),
-  };
+  const payload = new FormData();
+  payload.append("resume_text", resumeTextArea.value.trim());
+  payload.append("job_description_text", jobTextArea.value.trim());
+  payload.append("supplemental_text", supplementalTextArea.value.trim());
+
+  const resumeFile = resumeFileInput.files && resumeFileInput.files[0];
+  const jobDescriptionFile = jobDescFileInput.files && jobDescFileInput.files[0];
+  const supplementalFile = contextFileInput.files && contextFileInput.files[0];
+
+  if (resumeFile) payload.append("resume_file", resumeFile);
+  if (jobDescriptionFile) payload.append("job_description_file", jobDescriptionFile);
+  if (supplementalFile) payload.append("supplemental_file", supplementalFile);
 
   submitButton.disabled = true;
   setStatus("loading", "Analyzing...");
 
   try {
-    const response = await fetch("/analyze", {
+    const response = await fetch("/analyze-upload", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
+      body: payload,
     });
 
     const data = await response.json();

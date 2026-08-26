@@ -30,14 +30,14 @@ What is implemented (summary)
 
 Short-term next tasks (prioritized)
 
-1. Prototype alternate keyword extractors (TF‑IDF & RAKE) to generate candidate phrases from resumes and job descriptions. Use them for candidate generation and ranking.
+1. Prototype alternate keyword extractors (NER, embeddings) to generate candidate phrases from resumes and job descriptions. Use them for candidate generation and ranking.
 2. Implement an embeddings fallback (local sentence-transformers or OpenAI embeddings) for semantic matching of unresolved high-priority job keywords to resume sentences. Keep embeddings as a fallback to control cost and preserve explainability.
 3. Add server-side file ingestion for PDF and DOCX uploads (pdfplumber, python-docx) and wire file upload support in the frontend so users can upload resumes.
 4. Add more diagnostic tests and example fixtures (example resume/job pairs) to evaluate scoring behavior and tune weights.
 
 Long-term goals
 
-- Add an MLP or learned ranking model that combines deterministic features (exact matches, section evidence, TF‑IDF scores) with embedding similarities to produce a final alignment score.
+- Add an MLP or learned ranking model that combines deterministic features (exact matches, section evidence, keyBERT) with embedding similarities to produce a final alignment score.
 - Implement LLM-driven refinement (LLM only for rewriting bullets after deterministic analysis), ensuring explainability and no hallucination.
 - Productionize: CI, Docker image, secrets management for API keys, performance testing, and optional indexing (FAISS) for fast embedding lookups.
 - UX: richer frontend for uploading files, showing sentence-level evidence for matches, and exporting improved resume content.

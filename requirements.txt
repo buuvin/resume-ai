@@ -2,12 +2,15 @@ fastapi
 uvicorn[standard]
 python-dotenv
 openai
-langchain
 pypdf2
 pdfplumber
 pytest
 python-docx
 docx2txt
-jupyterlab
+python-multipart
+reportlab
+sentence-transformers
+keybert
+spacy
 black
 ruff

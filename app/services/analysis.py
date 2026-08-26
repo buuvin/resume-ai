@@ -251,6 +251,7 @@ def compute_weighted_alignment(resume_section_kws: dict, job_kws: dict, section_
         "projects": 1.1,
         "education": 0.8,
         "certifications": 0.6,
+        "supplemental": 0.9,
         "body": 1.0,
     }
 
@@ -316,6 +317,8 @@ def analyze_resume(resume: str, job_description: str, supplemental: str):
     job_kws = extract_job_keywords(job_description)
 
     supplemental_keywords = extract_keywords(supplemental) if supplemental else set()
+    if supplemental_keywords:
+        resume_section_kws["supplemental"] = supplemental_keywords
 
     matched, missing, score = compute_weighted_alignment(
         resume_section_kws, job_kws

@@ -22,18 +22,21 @@
         <form id="analysis-form" class="form">
           <label>
             <span>Resume</span>
-            <input id="resume-file" class="file-input" type="file" accept=".txt,.md,.rtf,.pdf,.doc,.docx" />
-            <small class="help-text">For the basic setup, paste resume text or load a text file. PDF and DOCX parsing can be added later.</small>
-            <textarea id="resume-text" name="resume_text" rows="10" placeholder="Paste the resume text here" required></textarea>
+            <input id="resume-file" class="file-input" type="file" accept=".txt,.md,.rtf,.pdf,.docx" />
+            <small class="help-text">Paste text or upload a TXT, PDF, or DOCX file. One is required.</small>
+            <textarea id="resume-text" name="resume_text" rows="10" placeholder="Paste the resume text here"></textarea>
           </label>
 
           <label>
             <span>Job description</span>
-            <textarea id="job-text" name="job_description_text" rows="10" placeholder="Paste the job description here" required></textarea>
+            <input id="job-desc-file" class="file-input" type="file" accept=".txt,.md,.rtf,.pdf,.docx" />
+            <small class="help-text">Paste text or upload a TXT, PDF, or DOCX file. One is required.</small>
+            <textarea id="job-text" name="job_description_text" rows="10" placeholder="Paste the job description here"></textarea>
           </label>
 
           <label>
             <span>Additional context</span>
+            <input id="context-file" class="file-input" type="file" accept=".txt,.md,.rtf,.pdf,.docx" />
             <textarea id="supplemental-text" name="supplemental_text" rows="6" placeholder="Add projects, coursework, or extra background"></textarea>
           </label>
 
