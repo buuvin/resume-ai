@@ -11,6 +11,7 @@ python-multipart
 reportlab
 sentence-transformers
 keybert
+keyphrase-vectorizers
 numpy
 spacy
 black

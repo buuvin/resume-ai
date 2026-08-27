@@ -1,4 +1,28 @@
-from app.services.analysis import extract_keywords
+from app.services.analysis import extract_domain_entities, extract_keywords
+
+
+def test_domain_entities_are_grouped_and_canonicalized():
+    entities = extract_domain_entities(
+        "Built ML APIs with PY, FastAPI, AWS, Docker, and Postgres."
+    )
+
+    assert entities == {
+        "languages": ["python"],
+        "frameworks": ["fastapi"],
+        "platforms": ["aws"],
+        "tools": ["docker"],
+        "databases": ["postgresql"],
+    }
+
+
+def test_domain_entities_require_whole_terms():
+    entities = extract_domain_entities(
+        "Experience with javascript and pandas, not javadoc or rediscovery."
+    )
+
+    assert entities["languages"] == ["javascript"]
+    assert entities["tools"] == ["pandas"]
+    assert entities["databases"] == []
 
 
 def test_stopword_and_numeric_filtering():

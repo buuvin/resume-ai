@@ -36,6 +36,9 @@ def test_analyze_endpoint():
     assert isinstance(data["analysis"]["job_keyword_count"], int)
     assert isinstance(data["analysis"]["supplemental_keyword_count"], int)
     assert isinstance(data["analysis"]["supplemental_used"], bool)
+    assert data["analysis"]["resume_entities"]["languages"] == ["python"]
+    assert data["analysis"]["job_description_entities"]["languages"] == ["python"]
+    assert data["analysis"]["supplemental_entities"]["databases"] == []
     assert data["analysis"]["supplemental_keyword_count"] > 0
     assert data["analysis"]["supplemental_used"] is True
     assert "sql" in data["analysis"]["matched_skills"]

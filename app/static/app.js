@@ -33,6 +33,14 @@ function renderList(items, emptyLabel, chipClass = "") {
     .join("")}</div>`;
 }
 
+function renderEntities(entities) {
+  const categories = ["languages", "frameworks", "platforms", "tools", "databases"];
+  return categories.map((category) => `
+    <h4>${category[0].toUpperCase()}${category.slice(1)}</h4>
+    ${renderList((entities || {})[category] || [], "None detected.")}
+  `).join("");
+}
+
 function renderResults(payload) {
   const analysis = payload.analysis || {};
   const improvements = payload.improvements || {};
@@ -69,6 +77,16 @@ function renderResults(payload) {
       ${renderList(analysis.job_description_keyphrases || [], "No phrases were extracted.")}
       <h4>From supplemental text</h4>
       ${renderList(analysis.supplemental_keyphrases || [], "No phrases were extracted.")}
+    </div>
+
+    <div class="card">
+      <h3>Domain entities</h3>
+      <h4>From resume</h4>
+      ${renderEntities(analysis.resume_entities)}
+      <h4>From job description</h4>
+      ${renderEntities(analysis.job_description_entities)}
+      <h4>From supplemental text</h4>
+      ${renderEntities(analysis.supplemental_entities)}
     </div>
 
     <div class="card">

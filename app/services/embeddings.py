@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
+from keyphrase_vectorizers import KeyphraseCountVectorizer
 from typing import Any
 
 import numpy as np
@@ -64,11 +65,15 @@ def extract_keyphrases(
 
     document_embedding = np.mean(np.asarray(embedded.embeddings), axis=0).reshape(1, -1)
     keybert_model = model or get_keybert_model()
+    vectorizer = KeyphraseCountVectorizer()
     phrases = keybert_model.extract_keywords(
         text,
         keyphrase_ngram_range=(1, 3),
         stop_words="english",
         top_n=top_n,
         doc_embeddings=document_embedding,
+        use_mmr=True,
+        diversity=0.5,
+        vectorizer=vectorizer
     )
     return [phrase for phrase, _score in phrases]

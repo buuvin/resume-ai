@@ -7,6 +7,13 @@ class AnalyzeRequest(BaseModel):
     job_description_text: str = Field(..., min_length=1)
     supplemental_text: Optional[str] = None
 
+class DomainEntities(BaseModel):
+    languages: List[str] = Field(default_factory=list)
+    frameworks: List[str] = Field(default_factory=list)
+    platforms: List[str] = Field(default_factory=list)
+    tools: List[str] = Field(default_factory=list)
+    databases: List[str] = Field(default_factory=list)
+
 class AnalysisResult(BaseModel):
     matched_skills: List[str]
     missing_skills: List[str]
@@ -18,6 +25,9 @@ class AnalysisResult(BaseModel):
     job_keyword_count: int
     supplemental_keyword_count: int
     supplemental_used: bool
+    resume_entities: DomainEntities
+    job_description_entities: DomainEntities
+    supplemental_entities: DomainEntities
 
 class ImprovementResult(BaseModel):
     rewritten_summary: str = ""

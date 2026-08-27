@@ -20,6 +20,71 @@ ABBREVIATIONS = {
     "js": "javascript",
     "py": "python",
     "postgres": "postgresql",
+    "aws": "amazon web services",
+    "gcp": "google cloud",
+    "k8s": "kubernetes",
+}
+
+DOMAIN_ENTITY_TAXONOMY = {
+    "languages": {
+        "c": "c",
+        "go": "go",
+        "java": "java",
+        "javascript": "javascript",
+        "kotlin": "kotlin",
+        "python": "python",
+        "r": "r",
+        "rust": "rust",
+        "scala": "scala",
+        "swift": "swift",
+        "typescript": "typescript",
+    },
+    "frameworks": {
+        "angular": "angular",
+        "django": "django",
+        "fastapi": "fastapi",
+        "flask": "flask",
+        "keras": "keras",
+        "next js": "next.js",
+        "pytorch": "pytorch",
+        "react": "react",
+        "scikit learn": "scikit-learn",
+        "spring": "spring",
+        "tensorflow": "tensorflow",
+        "vue": "vue",
+    },
+    "platforms": {
+        "amazon web services": "aws",
+        "azure": "azure",
+        "databricks": "databricks",
+        "google cloud": "gcp",
+        "heroku": "heroku",
+        "kubernetes": "kubernetes",
+        "snowflake": "snowflake",
+    },
+    "tools": {
+        "airflow": "airflow",
+        "docker": "docker",
+        "git": "git",
+        "github": "github",
+        "gitlab": "gitlab",
+        "jenkins": "jenkins",
+        "jupyter": "jupyter",
+        "kubeflow": "kubeflow",
+        "mlflow": "mlflow",
+        "pandas": "pandas",
+        "spark": "spark",
+    },
+    "databases": {
+        "bigquery": "bigquery",
+        "dynamodb": "dynamodb",
+        "elasticsearch": "elasticsearch",
+        "mongodb": "mongodb",
+        "mysql": "mysql",
+        "postgresql": "postgresql",
+        "redis": "redis",
+        "sqlite": "sqlite",
+    },
 }
 
 # Synonyms map various surface forms to a canonical skill/token name. Keep this small and
@@ -58,6 +123,22 @@ def expand_abbreviations(text: str) -> str:
             expanded_text,
         )
     return expanded_text
+
+
+def extract_domain_entities(text: str) -> dict[str, list[str]]:
+    """Extract canonical computer science and ML entities from normalized text."""
+    normalized = expand_abbreviations(clean_text(text))
+    entities = {category: set() for category in DOMAIN_ENTITY_TAXONOMY}
+
+    for category, terms in DOMAIN_ENTITY_TAXONOMY.items():
+        for term, canonical_name in terms.items():
+            if re.search(rf"\b{re.escape(term)}\b", normalized):
+                entities[category].add(canonical_name)
+
+    return {
+        category: sorted(found_entities)
+        for category, found_entities in entities.items()
+    }
 
 
 def match_phrases(text: str):
@@ -346,4 +427,7 @@ def analyze_resume(
         job_keyword_count=job_keyword_count,
         supplemental_keyword_count=len(supplemental_keywords),
         supplemental_used=bool(supplemental_keywords & (job_kws.get("required", set()) | job_kws.get("preferred", set()))),
+        resume_entities=extract_domain_entities(resume),
+        job_description_entities=extract_domain_entities(job_description),
+        supplemental_entities=extract_domain_entities(supplemental),
     )

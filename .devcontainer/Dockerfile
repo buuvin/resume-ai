@@ -14,6 +14,9 @@ WORKDIR /workspace
 # Install Python dependencies
 COPY requirements.txt .
 
+# Ensure pip is up-to-date
+RUN pip install --upgrade pip
+
 # Activate venv + install deps
 RUN pip install --no-cache-dir -r requirements.txt
 
