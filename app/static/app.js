@@ -62,6 +62,16 @@ function renderResults(payload) {
     </div>
 
     <div class="card">
+      <h3>KeyBERT phrases</h3>
+      <h4>From resume</h4>
+      ${renderList(analysis.resume_keyphrases || [], "No phrases were extracted.")}
+      <h4>From job description</h4>
+      ${renderList(analysis.job_description_keyphrases || [], "No phrases were extracted.")}
+      <h4>From supplemental text</h4>
+      ${renderList(analysis.supplemental_keyphrases || [], "No phrases were extracted.")}
+    </div>
+
+    <div class="card">
       <h3>Starter rewrite summary</h3>
       <p class="text-block">${escapeHtml(improvements.rewritten_summary || "No rewrite summary was returned.")}</p>
     </div>

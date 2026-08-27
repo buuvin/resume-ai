@@ -1,5 +1,5 @@
 from app.models.schemas import AnalyzeRequest, AnalyzeResponse, ImprovementResult
-from app.services.embeddings import embed_document
+from app.services.embeddings import embed_document, extract_keyphrases
 from app.services.ingestion import extract_upload_text
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from app.services.analysis import analyze_resume
@@ -7,6 +7,7 @@ from app.services.analysis import analyze_resume
 router = APIRouter()
 
 def build_response(resume_text: str, job_description_text: str, supplemental_text: str):
+    keyphrases = {}
     try:
         documents = {
             "resume": resume_text,
@@ -15,8 +16,11 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
         }
         for document_name, document_text in documents.items():
             embedded_document = embed_document(document_text)
+            keyphrases[document_name] = extract_keyphrases(
+                document_text, embedded_document=embedded_document
+            )
             if embedded_document.lines:
-                print(
+                print( 
                     f"[embeddings] {document_name} first sentence: {embedded_document.lines[0]}",
                     flush=True,
                 )
@@ -26,12 +30,17 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
                 )
     except ModuleNotFoundError as error:
         print(
-            f"[embeddings] unavailable: install sentence-transformers ({error.name})",
+            f"[embeddings] unavailable: install the embedding and KeyBERT dependencies ({error.name})",
             flush=True,
         )
 
     analysis = analyze_resume(
-        resume_text, job_description_text, supplemental_text
+        resume_text,
+        job_description_text,
+        supplemental_text,
+        resume_keyphrases=set(keyphrases.get("resume", [])),
+        job_keyphrases=set(keyphrases.get("job description", [])),
+        supplemental_keyphrases=set(keyphrases.get("supplemental", [])),
     )
     if analysis.missing_skills:
         top_gap_list = ", ".join(analysis.missing_skills[:3])

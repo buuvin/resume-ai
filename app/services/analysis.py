@@ -309,7 +309,14 @@ def compute_weighted_alignment(resume_section_kws: dict, job_kws: dict, section_
     return matched, missing, score
 
 
-def analyze_resume(resume: str, job_description: str, supplemental: str):
+def analyze_resume(
+    resume: str,
+    job_description: str,
+    supplemental: str,
+    resume_keyphrases: set[str] | None = None,
+    job_keyphrases: set[str] | None = None,
+    supplemental_keyphrases: set[str] | None = None,
+):
     # Section-aware keywords from the resume
     resume_section_kws = extract_section_keywords(resume)
 
@@ -331,6 +338,9 @@ def analyze_resume(resume: str, job_description: str, supplemental: str):
     return AnalysisResult(
         matched_skills=list(matched),
         missing_skills=list(missing),
+        resume_keyphrases=sorted(resume_keyphrases or set()),
+        job_description_keyphrases=sorted(job_keyphrases or set()),
+        supplemental_keyphrases=sorted(supplemental_keyphrases or set()),
         alignment_score=round(score, 2),
         resume_keyword_count=resume_keyword_count,
         job_keyword_count=job_keyword_count,

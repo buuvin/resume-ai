@@ -20,9 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy rest of code
 COPY . .
 
-# Use venv by default
-ENV PATH="/app/venv/bin:$PATH"
-
 # Expose FastAPI port
 EXPOSE 8000
 

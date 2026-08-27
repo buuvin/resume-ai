@@ -10,6 +10,9 @@ class AnalyzeRequest(BaseModel):
 class AnalysisResult(BaseModel):
     matched_skills: List[str]
     missing_skills: List[str]
+    resume_keyphrases: List[str]
+    job_description_keyphrases: List[str]
+    supplemental_keyphrases: List[str]
     alignment_score: float
     resume_keyword_count: int
     job_keyword_count: int

@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
+import numpy as np
+
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 
@@ -40,3 +42,33 @@ def embed_document(text: str, model: Any | None = None) -> EmbeddedDocument:
         lines=lines,
         embeddings=[list(vector) for vector in vectors],
     )
+
+
+@lru_cache(maxsize=1)
+def get_keybert_model() -> Any:
+    from keybert import KeyBERT
+
+    return KeyBERT(model=get_embedding_model())
+
+
+def extract_keyphrases(
+    text: str,
+    embedded_document: EmbeddedDocument | None = None,
+    model: Any | None = None,
+    top_n: int = 10,
+) -> list[str]:
+    """Extract KeyBERT phrases while reusing the document's existing embeddings."""
+    embedded = embedded_document or embed_document(text)
+    if not embedded.lines:
+        return []
+
+    document_embedding = np.mean(np.asarray(embedded.embeddings), axis=0).reshape(1, -1)
+    keybert_model = model or get_keybert_model()
+    phrases = keybert_model.extract_keywords(
+        text,
+        keyphrase_ngram_range=(1, 3),
+        stop_words="english",
+        top_n=top_n,
+        doc_embeddings=document_embedding,
+    )
+    return [phrase for phrase, _score in phrases]
