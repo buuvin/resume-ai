@@ -7,6 +7,8 @@ This document captures the current state of the project, what has been implement
 Where to look
 
 - Analysis engine: app/services/analysis.py
+- Embeddings & keybert: app/services/embeddings.py
+- PDF ingestion: app/services/ingestion.py
 - API + server: app/main.py and app/routes/analyze.py
 - Models (request/response shapes): app/models/schemas.py
 - Frontend static demo: app/static/index.html, app/static/app.js, app/static/styles.css
@@ -26,14 +28,16 @@ What is implemented (summary)
   - Section-aware parsing (parse_sections) to detect `skills`, `experience`, `summary`, `projects`, `education`, `requirements`/`preferred` headings.
   - Job-description keyword extraction distinguishing `required` vs `preferred` keywords.
   - Weighted scoring (compute_weighted_alignment) that weights section evidence, gives phrase bonuses, and prioritizes required keywords.
+  - Embedding documents that are uploaded through the website, used for keybert for extracting key phrases
+  - Entity recognition to categorize keywords into relevant sections for software related fields
 - Tests covering endpoint, phrase/synonym extraction, section parsing, and filters. All tests pass in the dev environment.
 
 Short-term next tasks (prioritized)
 
-1. Prototype alternate keyword extractors (NER, embeddings) to generate candidate phrases from resumes and job descriptions. Use them for candidate generation and ranking.
+1. Compare vanilla keybert to guided keybert by using entities produced through NER to see how well 
+keybert utilizes guide words without losing important information
 2. Implement an embeddings fallback (local sentence-transformers or OpenAI embeddings) for semantic matching of unresolved high-priority job keywords to resume sentences. Keep embeddings as a fallback to control cost and preserve explainability.
-3. Add server-side file ingestion for PDF and DOCX uploads (pdfplumber, python-docx) and wire file upload support in the frontend so users can upload resumes.
-4. Add more diagnostic tests and example fixtures (example resume/job pairs) to evaluate scoring behavior and tune weights.
+3. Gap detection to understand where the resume falters compared to the jd, eventually feeds into LLM to better fine tune the resume
 
 Long-term goals
 
