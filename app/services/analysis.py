@@ -165,7 +165,7 @@ def parse_sections(text: str):
         "projects": ["projects", "personal projects"],
         "education": ["education", "academic"],
         "certifications": ["certifications", "licenses"],
-        "requirements": ["requirements", "qualifications"],
+        "requirements": ["requirements", "requirement", "qualifications", "qualification"],
         "preferred": ["nice to have", "nice-to-have", "preferred", "nice to haves"],
     }
 
@@ -210,6 +210,8 @@ def parse_sections(text: str):
     if not sections:
         return {"body": text}
 
+    # for section_name, section_text in sect ions.items():
+    #     print(f"[sections] {section_name}: {section_text.strip()}", flush=True)
     return sections
 
 

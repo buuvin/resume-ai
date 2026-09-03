@@ -1,5 +1,10 @@
 from app.models.schemas import AnalyzeRequest, AnalyzeResponse, ImprovementResult
-from app.services.embeddings import embed_document, extract_keyphrases
+from app.services.embeddings import (
+    compare_bullet_embeddings,
+    embed_document,
+    extract_keyphrases,
+    print_bullet_similarity,
+)
 from app.services.ingestion import extract_upload_text
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from app.services.analysis import analyze_resume
@@ -19,15 +24,18 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
             keyphrases[document_name] = extract_keyphrases(
                 document_text, embedded_document=embedded_document
             )
-            if embedded_document.lines:
-                print( 
-                    f"[embeddings] {document_name} first sentence: {embedded_document.lines[0]}",
-                    flush=True,
-                )
-                print(
-                    f"[embeddings] {document_name} embedding: {embedded_document.embeddings[0]}",
-                    flush=True,
-                )
+            # if embedded_document.lines:
+            #     print( 
+            #         f"[embeddings] {document_name} first sentence: {embedded_document.lines[0]}",
+            #         flush=True,
+            #     )
+            #     print(
+            #         f"[embeddings] {document_name} embedding: {embedded_document.embeddings[0]}",
+            #         flush=True,
+            #     )
+        print_bullet_similarity(
+            compare_bullet_embeddings(resume_text, job_description_text)
+        )
     except ModuleNotFoundError as error:
         print(
             f"[embeddings] unavailable: install the embedding and KeyBERT dependencies ({error.name})",
