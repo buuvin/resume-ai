@@ -34,12 +34,8 @@ What is implemented (summary)
 
 Short-term next tasks (prioritized)
 
-1. Compare vanilla keybert to guided keybert by using entities produced through NER to see how well 
-keybert utilizes guide words without losing important information
-2. Implement an embeddings fallback (local sentence-transformers or OpenAI embeddings) for semantic matching of unresolved high-priority job keywords to resume sentences. Keep embeddings as a fallback to control cost and preserve explainability.
-3. Gap detection to understand where the resume falters compared to the jd, eventually feeds into LLM to better fine tune the resume
-prompt:i want to tackle the second short term goal, but i want ot adjust it a little bit. Right now, i embed whole documents line by line and use that for keybert. Now i want to collect specific embeddings from the resume and job description and compare them with each other to see what bullet poitns are similar to see wehre strenghts align with the JD. I want the implementation to look like this:
-1. Collect embeddings from bullet points under work experience/projects
+1. Gap detection to understand where the resume falters compared to the jd, eventually feeds into LLM to better fine tune the resume
+2. Develop a structure for utilizing embeddings, keybert keyphrases, and NER entities to determine whether requirements from the job description are met. Current implementation derives keywords to determine whether requirements are met. Next step should be to implement semantic understnading to see how the most relevant resume evidence relates to the requirements through embeddings as well.
 Long-term goals
 
 - Add an MLP or learned ranking model that combines deterministic features (exact matches, section evidence, keyBERT) with embedding similarities to produce a final alignment score.

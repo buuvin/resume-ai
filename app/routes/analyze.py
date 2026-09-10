@@ -13,6 +13,7 @@ router = APIRouter()
 
 def build_response(resume_text: str, job_description_text: str, supplemental_text: str):
     keyphrases = {}
+    bullet_similarity = None
     try:
         documents = {
             "resume": resume_text,
@@ -33,9 +34,10 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
             #         f"[embeddings] {document_name} embedding: {embedded_document.embeddings[0]}",
             #         flush=True,
             #     )
-        print_bullet_similarity(
-            compare_bullet_embeddings(resume_text, job_description_text)
+        bullet_similarity = compare_bullet_embeddings(
+            resume_text, job_description_text
         )
+        print_bullet_similarity(bullet_similarity)
     except ModuleNotFoundError as error:
         print(
             f"[embeddings] unavailable: install the embedding and KeyBERT dependencies ({error.name})",
@@ -49,6 +51,7 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
         resume_keyphrases=set(keyphrases.get("resume", [])),
         job_keyphrases=set(keyphrases.get("job description", [])),
         supplemental_keyphrases=set(keyphrases.get("supplemental", [])),
+        bullet_similarity=bullet_similarity,
     )
     if analysis.missing_skills:
         top_gap_list = ", ".join(analysis.missing_skills[:3])

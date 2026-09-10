@@ -1,7 +1,13 @@
 import re
 import unicodedata
 
-from app.models.schemas import AnalysisResult
+from app.models.schemas import (
+    AnalysisResult,
+    GapAnalysis,
+    Requirement,
+    RequirementCoverage,
+    ResumeEvidence,
+)
 
 COMMON_PHRASES = [
     "machine learning",
@@ -392,6 +398,108 @@ def compute_weighted_alignment(resume_section_kws: dict, job_kws: dict, section_
     return matched, missing, score
 
 
+def normalize_optimization_evidence(
+    bullet_similarity: object | None = None,
+    keyphrases: set[str] | None = None,
+    entities: dict[str, list[str]] | None = None,
+) -> dict[str, set[str]]:
+    """Normalize resume evidence while preserving each signal's source."""
+    normalized: dict[str, set[str]] = {}
+
+    if bullet_similarity is not None:
+        for match in getattr(bullet_similarity, "top_matches", []):
+            if match.similarity_score >= 0.5:
+                normalized.setdefault("embedding_bullets", set()).update(
+                    extract_keywords(match.resume_bullet)
+                )
+
+    for phrase in keyphrases or set():
+        normalized.setdefault("keyphrases", set()).update(extract_keywords(phrase))
+
+    for entity_values in (entities or {}).values():
+        for entity in entity_values:
+            normalized.setdefault("entities", set()).update(extract_keywords(entity))
+
+    return normalized
+
+
+def build_optimization_analysis(
+    normalized_resume_evidence: dict[str, set[str]],
+    job_kws: dict[str, set[str]],
+) -> tuple[list[Requirement], list[ResumeEvidence], list[RequirementCoverage], list[GapAnalysis]]:
+    """Build honest, deterministic inputs for a later LLM optimization step."""
+    requirements = [
+        Requirement(keyword=keyword, priority=priority)
+        for priority in ("required", "preferred")
+        for keyword in sorted(job_kws.get(priority, set()))
+    ]
+
+    evidence_by_keyword: dict[str, ResumeEvidence] = {}
+    for section, keywords in normalized_resume_evidence.items():
+        for keyword in keywords:
+            evidence = evidence_by_keyword.get(keyword)
+            if evidence is None:
+                evidence_by_keyword[keyword] = ResumeEvidence(
+                    keyword=keyword,
+                    sections=[section],
+                    prominence="prominent" if section in {"skills", "experience"} else "supporting",
+                )
+                continue
+
+            if section not in evidence.sections:
+                evidence.sections.append(section)
+            if section in {"skills", "experience"} or len(evidence.sections) > 1:
+                evidence.prominence = "prominent"
+
+    resume_evidence = [evidence_by_keyword[keyword] for keyword in sorted(evidence_by_keyword)]
+    coverage = []
+    gaps = []
+    for requirement in requirements:
+        evidence = evidence_by_keyword.get(requirement.keyword)
+        if evidence is None:
+            status = "missing"
+            coverage_score = 0.0
+            gaps.append(
+                GapAnalysis(
+                    action="augment",
+                    requirement=requirement,
+                    rationale="No matching evidence was found in the resume text.",
+                    suggested_change=(
+                        f"Add truthful evidence for {requirement.keyword} only if the candidate has it; "
+                        "otherwise leave the requirement unclaimed."
+                    ),
+                )
+            )
+        elif evidence.prominence == "prominent":
+            status = "covered"
+            coverage_score = 1.0
+        else:
+            status = "underrepresented"
+            coverage_score = 0.5
+            gaps.append(
+                GapAnalysis(
+                    action="promote",
+                    requirement=requirement,
+                    rationale="Matching evidence exists, but it appears outside the strongest resume sections.",
+                    suggested_change=(
+                        f"Promote the existing {requirement.keyword} evidence into a relevant skills or "
+                        "experience bullet without adding unsupported claims."
+                    ),
+                )
+            )
+
+        coverage.append(
+            RequirementCoverage(
+                requirement=requirement,
+                status=status,
+                coverage_score=coverage_score,
+                evidence=[evidence] if evidence else [],
+            )
+        )
+
+    return requirements, resume_evidence, coverage, gaps
+    
+
 def analyze_resume(
     resume: str,
     job_description: str,
@@ -399,9 +507,16 @@ def analyze_resume(
     resume_keyphrases: set[str] | None = None,
     job_keyphrases: set[str] | None = None,
     supplemental_keyphrases: set[str] | None = None,
+    bullet_similarity: object | None = None,
 ):
     # Section-aware keywords from the resume
     resume_section_kws = extract_section_keywords(resume)
+    resume_entities = extract_domain_entities(resume)
+    normalized_resume_evidence = normalize_optimization_evidence(
+        bullet_similarity=bullet_similarity,
+        keyphrases=resume_keyphrases,
+        entities=resume_entities,
+    )
 
     # Job-driven required/preferred keywords
     job_kws = extract_job_keywords(job_description)
@@ -412,6 +527,9 @@ def analyze_resume(
 
     matched, missing, score = compute_weighted_alignment(
         resume_section_kws, job_kws
+    )
+    requirements, resume_evidence, requirement_coverage, gap_analysis = build_optimization_analysis(
+        normalized_resume_evidence, job_kws
     )
 
     # counts for diagnostics and frontend display
@@ -429,7 +547,11 @@ def analyze_resume(
         job_keyword_count=job_keyword_count,
         supplemental_keyword_count=len(supplemental_keywords),
         supplemental_used=bool(supplemental_keywords & (job_kws.get("required", set()) | job_kws.get("preferred", set()))),
-        resume_entities=extract_domain_entities(resume),
+        resume_entities=resume_entities,
         job_description_entities=extract_domain_entities(job_description),
         supplemental_entities=extract_domain_entities(supplemental),
+        requirements=requirements,
+        resume_evidence=resume_evidence,
+        requirement_coverage=requirement_coverage,
+        gap_analysis=gap_analysis,
     )
