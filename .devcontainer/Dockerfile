@@ -17,7 +17,7 @@ COPY requirements.txt .
 # Ensure pip is up-to-date
 RUN pip install --upgrade pip
 
-# Activate venv + install deps
+# Install dependencies globally in the container
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy rest of code

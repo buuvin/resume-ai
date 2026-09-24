@@ -1,21 +1,12 @@
 import re
 import unicodedata
 
+import numpy as np
+
 from app.models.schemas import (
     AnalysisResult,
-    GapAnalysis,
-    Requirement,
-    RequirementCoverage,
-    ResumeEvidence,
+    AlignmentEvidence,
 )
-
-COMMON_PHRASES = [
-    "machine learning",
-    "deep learning",
-    "data science",
-    "natural language processing",
-    "computer vision",
-]
 
 ABBREVIATIONS = {
     "ml": "machine learning",
@@ -29,6 +20,8 @@ ABBREVIATIONS = {
     "aws": "amazon web services",
     "gcp": "google cloud",
     "k8s": "kubernetes",
+    "llm": "large language model",
+    "rag": "retrieval augmented generation"
 }
 
 DOMAIN_ENTITY_TAXONOMY = {
@@ -67,6 +60,7 @@ DOMAIN_ENTITY_TAXONOMY = {
         "heroku": "heroku",
         "kubernetes": "kubernetes",
         "snowflake": "snowflake",
+        "tableau": "tableau",
     },
     "tools": {
         "airflow": "airflow",
@@ -91,24 +85,33 @@ DOMAIN_ENTITY_TAXONOMY = {
         "redis": "redis",
         "sqlite": "sqlite",
     },
+    "concepts": {
+        "artificial intelligence": "artificial intelligence",
+        "computer vision": "computer vision",
+        "data engineering": "data engineering",
+        "data science": "data science",
+        "deep learning": "deep learning",
+        "generative ai": "generative ai",
+        "large language model": "large language model",
+        "neural networks": "neural networks",
+        "machine learning": "machine learning",
+        "natural language processing": "natural language processing",
+        "prompt engineering": "prompt engineering",
+        "reinforcement learning": "reinforcement learning",
+        "retrieval augmented generation": "retrieval augmented generation",
+        "supervised learning": "supervised learning",
+        "unsupervised learning": "unsupervised learning",
+    },
 }
 
-# Synonyms map various surface forms to a canonical skill/token name. Keep this small and
-# high-value; it can be expanded over time or loaded from an external taxonomy.
 SYNONYMS = {
-    "etl": "data pipeline",
-    "data pipelines": "data pipeline",
-    "data engineering": "data pipeline",
     "aws": "amazon web services",
     "aws lambda": "amazon web services",
     "gcp": "google cloud",
-    "ci/cd": "ci cd",
 }
 
-PHRASE_PATTERN = re.compile(
-    # Match any known multi-word skill phrase as a whole, not as separate tokens.
-    r"\b(?:" + "|".join(re.escape(phrase) for phrase in sorted(COMMON_PHRASES, key=len, reverse=True)) + r")\b"
-)
+MATCHED_ALIGNMENT_THRESHOLD = 0.70
+UNDERREPRESENTED_ALIGNMENT_THRESHOLD = 0.45
 
 def clean_text(text: str) -> str:
     # Normalize visually similar Unicode characters so matching is consistent across copy/pasted text.
@@ -145,14 +148,6 @@ def extract_domain_entities(text: str) -> dict[str, list[str]]:
         category: sorted(found_entities)
         for category, found_entities in entities.items()
     }
-
-
-def match_phrases(text: str):
-    matched_phrases = set()
-    for match in PHRASE_PATTERN.finditer(text):
-        # Collect exact phrase matches so they can be scored separately from single-word tokens.
-        matched_phrases.add(match.group(0))
-    return matched_phrases
 
 
 def parse_sections(text: str):
@@ -216,342 +211,148 @@ def parse_sections(text: str):
     if not sections:
         return {"body": text}
 
-    # for section_name, section_text in sect ions.items():
-    #     print(f"[sections] {section_name}: {section_text.strip()}", flush=True)
     return sections
 
 
-def extract_section_keywords(text: str):
-    """Return a mapping section_name -> set(keywords) for the provided resume text."""
-    sections = parse_sections(text)
-    section_keywords = {}
-    for name, body in sections.items():
-        section_keywords[name] = extract_keywords(body or "")
-    return section_keywords
+def _unique_strings(values: list[str] | set[str] | None) -> list[str]:
+    return list(dict.fromkeys(value.strip() for value in values or [] if value and value.strip()))
 
 
-def extract_job_keywords(job_text: str):
-    """Extract job-description-driven keywords and mark required vs preferred.
-
-    Simple heuristic: if the job description contains a `requirements` or `qualifications`
-    section, treat keywords in that section as `required`, and everything else as `preferred`.
-    Otherwise, all extracted keywords are `preferred`.
-    """
-    sections = parse_sections(job_text)
-    required = set()
-    preferred = set()
-
-    for name, body in sections.items():
-        kws = extract_keywords(body or "")
-        if name == "requirements":
-            required.update(kws)
-        else:
-            preferred.update(kws)
-
-    # if no explicit requirements, consider all as preferred
-    if not required:
-        return {"required": set(), "preferred": preferred}
-
-    # ensure required are not duplicated in preferred
-    preferred = preferred - required
-    return {"required": required, "preferred": preferred}
-
-STOPWORDS = {
-    "the", "and", "with", "for", "a", "an", "to", "of", "in", "on", "is"
-}
-
-# Expanded stopwords to filter resume noise; kept conservative to avoid removing meaningful tokens.
-STOPWORDS.update({
-    "experience", "responsible", "responsible for", "team", "teams", "worked", "work",
-    "years", "year", "month", "months", "worked", "including", "using", "used",
-    "knowledge", "skills", "skill", "proven", "strong", "demonstrated",
-})
-
-# Phrases that are resume fluff and should not be treated as keywords even if they match phrase patterns.
-PHRASE_BLACKLIST = {
-    "responsible for",
-    "team",
-    "worked at",
-    "experience in",
-}
-
-def tokenize(text: str):
-    words = text.split()
-    return [w for w in words if w not in STOPWORDS]
-
-def extract_keywords(text: str):
-    cleaned = clean_text(text)
-    expanded = expand_abbreviations(cleaned)
-
-    keywords = set()
-    phrases = match_phrases(expanded)
-    # Filter out any blacklisted phrases
-    phrases = {p for p in phrases if p not in PHRASE_BLACKLIST}
-    keywords.update(phrases)
-
-    token_text = expanded
-    for phrase in phrases:
-        # Remove phrase hits before tokenizing so the same words are not counted twice.
-        token_text = re.sub(rf"\b{re.escape(phrase)}\b", " ", token_text)
-
-    tokens = tokenize(token_text)
-    keywords.update(tokens)
-
-    # Canonicalize keywords via synonym mapping so different surface forms collapse
-    def canonicalize(k: str) -> str:
-        low = k.lower().strip()
-        if low in SYNONYMS:
-            return SYNONYMS[low]
-        return low
-
-    # Canonicalize keywords via synonym mapping so different surface forms collapse
-    canonical = set()
-    for k in keywords:
-        c = canonicalize(k)
-        # filter short tokens, numeric-only tokens, and stopwords
-        if len(c) <= 1:
-            continue
-        if c.isdigit():
-            continue
-        if c in STOPWORDS:
-            continue
-        canonical.add(c)
-
-    return canonical
-
-def compare_keywords(resume_keywords, job_keywords):
-    matched = resume_keywords & job_keywords
-    missing = job_keywords - resume_keywords
-
-    score = len(matched) / max(len(job_keywords), 1)
-
-    return matched, missing, score
-
-def compute_weighted_alignment(resume_section_kws: dict, job_kws: dict, section_weights: dict | None = None):
-    """Compute a weighted alignment score between resume sections and job keywords.
-
-    Returns (matched_set, missing_set, score_float_between_0_and_1)
-    """
-    # default section importance weights
-    default_weights = {
-        "skills": 2.0,
-        "experience": 1.5,
-        "summary": 1.2,
-        "projects": 1.1,
-        "education": 0.8,
-        "certifications": 0.6,
-        "supplemental": 0.9,
-        "body": 1.0,
-    }
-
-    if section_weights is None:
-        section_weights = default_weights
-
-    required = job_kws.get("required", set())
-    preferred = job_kws.get("preferred", set())
-
-    matched = set()
-    total_possible = 0.0
-    total_matched = 0.0
-
-    # helper to find best evidence weight for a keyword across sections
-    def best_section_weight_for(k):
-        best = 0.0
-        for sec, kws in resume_section_kws.items():
-            if k in kws:
-                w = section_weights.get(sec, section_weights.get("body", 1.0))
-                if w > best:
-                    best = w
-        return best
-
-    # scoring parameters
-    required_multiplier = 3.0
-    preferred_multiplier = 1.0
-    phrase_bonus = 1.5  # multiply weight when matched keyword is a multi-word phrase
-
-    # Compute totals for required
-    max_w = max(section_weights.values())
-    for k in required:
-        total_possible += (max_w * phrase_bonus if " " in k else max_w) * required_multiplier
-
-        best_w = best_section_weight_for(k)
-        if best_w > 0:
-            boost = phrase_bonus if " " in k else 1.0
-            total_matched += best_w * boost * required_multiplier
-            matched.add(k)
-
-    # Compute totals for preferred
-    for k in preferred:
-        total_possible += (max_w * phrase_bonus if " " in k else max_w) * preferred_multiplier
-
-        best_w = best_section_weight_for(k)
-        if best_w > 0:
-            boost = phrase_bonus if " " in k else 1.0
-            total_matched += best_w * boost * preferred_multiplier
-            matched.add(k)
-
-    score = total_matched / max(total_possible, 1.0)
-
-    # missing are job keywords not present in matched
-    missing = set(list(required | preferred)) - matched
-
-    return matched, missing, score
+def _alignment_normalize(text: str) -> str:
+    normalized = clean_text(text)
+    normalized = SYNONYMS.get(normalized, normalized)
+    normalized = expand_abbreviations(normalized)
+    return SYNONYMS.get(normalized, normalized)
 
 
-def normalize_optimization_evidence(
-    bullet_similarity: object | None = None,
-    keyphrases: set[str] | None = None,
-    entities: dict[str, list[str]] | None = None,
-) -> dict[str, set[str]]:
-    """Normalize resume evidence while preserving each signal's source."""
-    normalized: dict[str, set[str]] = {}
+def alignment_machine(
+    source: str,
+    evidence: list[str],
+    requirement: list[str],
+) -> list[AlignmentEvidence]:
+    """Match every job requirement to its strongest same-source resume evidence."""
+    if source not in {"ner", "keybert", "bulletpoints"}:
+       raise ValueError("source must be 'ner', 'keybert', or 'bulletpoints'")
 
-    if bullet_similarity is not None:
-        for match in getattr(bullet_similarity, "top_matches", []):
-            if match.similarity_score >= 0.5:
-                normalized.setdefault("embedding_bullets", set()).update(
-                    extract_keywords(match.resume_bullet)
-                )
+    from app.services.embeddings import embed_document
 
-    for phrase in keyphrases or set():
-        normalized.setdefault("keyphrases", set()).update(extract_keywords(phrase))
+    evidence_strings = _unique_strings(evidence)
+    requirement_strings = _unique_strings(requirement)
+    if not requirement_strings:
+        return []
 
-    for entity_values in (entities or {}).values():
-        for entity in entity_values:
-            normalized.setdefault("entities", set()).update(extract_keywords(entity))
+    evidence_document = embed_document("\n".join(evidence_strings))
+    requirement_document = embed_document("\n".join(requirement_strings))
+    evidence_vectors = np.asarray(evidence_document.embeddings, dtype=float)
+    requirement_vectors = np.asarray(requirement_document.embeddings, dtype=float)
 
-    return normalized
-
-
-def build_optimization_analysis(
-    normalized_resume_evidence: dict[str, set[str]],
-    job_kws: dict[str, set[str]],
-) -> tuple[list[Requirement], list[ResumeEvidence], list[RequirementCoverage], list[GapAnalysis]]:
-    """Build honest, deterministic inputs for a later LLM optimization step."""
-    requirements = [
-        Requirement(keyword=keyword, priority=priority)
-        for priority in ("required", "preferred")
-        for keyword in sorted(job_kws.get(priority, set()))
-    ]
-
-    evidence_by_keyword: dict[str, ResumeEvidence] = {}
-    for section, keywords in normalized_resume_evidence.items():
-        for keyword in keywords:
-            evidence = evidence_by_keyword.get(keyword)
-            if evidence is None:
-                evidence_by_keyword[keyword] = ResumeEvidence(
-                    keyword=keyword,
-                    sections=[section],
-                    prominence="prominent" if section in {"skills", "experience"} else "supporting",
-                )
-                continue
-
-            if section not in evidence.sections:
-                evidence.sections.append(section)
-            if section in {"skills", "experience"} or len(evidence.sections) > 1:
-                evidence.prominence = "prominent"
-
-    resume_evidence = [evidence_by_keyword[keyword] for keyword in sorted(evidence_by_keyword)]
-    coverage = []
-    gaps = []
-    for requirement in requirements:
-        evidence = evidence_by_keyword.get(requirement.keyword)
-        if evidence is None:
-            status = "missing"
-            coverage_score = 0.0
-            gaps.append(
-                GapAnalysis(
-                    action="augment",
-                    requirement=requirement,
-                    rationale="No matching evidence was found in the resume text.",
-                    suggested_change=(
-                        f"Add truthful evidence for {requirement.keyword} only if the candidate has it; "
-                        "otherwise leave the requirement unclaimed."
-                    ),
-                )
+    if not evidence_strings or evidence_vectors.size == 0:
+        return [
+            AlignmentEvidence(
+                source=source,
+                requirement=item,
+                evidence="",
+                alignment=0.0,
+                exact_match=False,
             )
-        elif evidence.prominence == "prominent":
-            status = "covered"
-            coverage_score = 1.0
-        else:
-            status = "underrepresented"
-            coverage_score = 0.5
-            gaps.append(
-                GapAnalysis(
-                    action="promote",
-                    requirement=requirement,
-                    rationale="Matching evidence exists, but it appears outside the strongest resume sections.",
-                    suggested_change=(
-                        f"Promote the existing {requirement.keyword} evidence into a relevant skills or "
-                        "experience bullet without adding unsupported claims."
-                    ),
-                )
-            )
+            for item in requirement_strings
+        ]
 
-        coverage.append(
-            RequirementCoverage(
-                requirement=requirement,
-                status=status,
-                coverage_score=coverage_score,
-                evidence=[evidence] if evidence else [],
+    similarity_matrix = np.clip(requirement_vectors @ evidence_vectors.T, -1.0, 1.0)
+    alignments = []
+    for index, requirement_item in enumerate(requirement_strings):
+        evidence_index = int(np.argmax(similarity_matrix[index]))
+        evidence_item = evidence_strings[evidence_index]
+        alignments.append(
+            AlignmentEvidence(
+                source=source,
+                requirement=requirement_item,
+                evidence=evidence_item,
+                alignment=float(similarity_matrix[index, evidence_index]),
+                exact_match=(
+                    _alignment_normalize(requirement_item)
+                    == _alignment_normalize(evidence_item)
+                ),
             )
         )
+    return alignments
 
-    return requirements, resume_evidence, coverage, gaps
-    
+
+def _flatten_entities(entities: dict[str, list[str]]) -> list[str]:
+    return _unique_strings(
+        [entity for category in entities.values() for entity in category]
+    )
+
+
+def _summarize_alignment(
+    alignment_evidence: list[AlignmentEvidence],
+) -> tuple[list[str], list[str], list[str], float]:
+    """Summarize semantic evidence without falling back to token extraction."""
+    best_alignment_by_requirement = {}
+    for item in alignment_evidence:
+        best_alignment_by_requirement[item.requirement] = max(
+            best_alignment_by_requirement.get(item.requirement, 0.0),
+            item.alignment,
+        )
+
+    matched = {
+        requirement
+        for requirement, alignment in best_alignment_by_requirement.items()
+        if alignment >= MATCHED_ALIGNMENT_THRESHOLD
+    }
+    underrepresented = {
+        requirement
+        for requirement, alignment in best_alignment_by_requirement.items()
+        if UNDERREPRESENTED_ALIGNMENT_THRESHOLD <= alignment < MATCHED_ALIGNMENT_THRESHOLD
+    }
+    missing = set(best_alignment_by_requirement) - matched - underrepresented
+    score = (
+        sum(best_alignment_by_requirement.values())
+        / len(best_alignment_by_requirement)
+        if best_alignment_by_requirement
+        else 0.0
+    )
+    return sorted(matched), sorted(underrepresented), sorted(missing), round(score, 2)
 
 def analyze_resume(
     resume: str,
     job_description: str,
     supplemental: str,
     resume_keyphrases: set[str] | None = None,
-    job_keyphrases: set[str] | None = None,
+    jd_keyphrases: set[str] | None = None,
     supplemental_keyphrases: set[str] | None = None,
     bullet_similarity: object | None = None,
 ):
-    # Section-aware keywords from the resume
-    resume_section_kws = extract_section_keywords(resume)
     resume_entities = extract_domain_entities(resume)
-    normalized_resume_evidence = normalize_optimization_evidence(
-        bullet_similarity=bullet_similarity,
-        keyphrases=resume_keyphrases,
-        entities=resume_entities,
+    jd_entities = extract_domain_entities(job_description)
+
+    alignment_evidence = []
+    alignment_evidence.extend(
+        alignment_machine("ner", _flatten_entities(resume_entities), _flatten_entities(jd_entities))
+    )
+    alignment_evidence.extend(
+        alignment_machine("keybert", list(resume_keyphrases or []), list(jd_keyphrases or []))
+    )
+    alignment_evidence.extend(
+        alignment_machine(
+            "bulletpoints",
+            getattr(bullet_similarity, "resume_bullets", []),
+            getattr(bullet_similarity, "job_description_bullets", []),
+        )
     )
 
-    # Job-driven required/preferred keywords
-    job_kws = extract_job_keywords(job_description)
-
-    supplemental_keywords = extract_keywords(supplemental) if supplemental else set()
-    if supplemental_keywords:
-        resume_section_kws["supplemental"] = supplemental_keywords
-
-    matched, missing, score = compute_weighted_alignment(
-        resume_section_kws, job_kws
-    )
-    requirements, resume_evidence, requirement_coverage, gap_analysis = build_optimization_analysis(
-        normalized_resume_evidence, job_kws
-    )
-
-    # counts for diagnostics and frontend display
-    resume_keyword_count = sum(len(v) for v in resume_section_kws.values())
-    job_keyword_count = len(job_kws.get("required", set()) | job_kws.get("preferred", set()))
+    matched, underrepresented, missing, score = _summarize_alignment(alignment_evidence)
 
     return AnalysisResult(
         matched_skills=list(matched),
+        underrepresented_skills=list(underrepresented),
         missing_skills=list(missing),
         resume_keyphrases=sorted(resume_keyphrases or set()),
-        job_description_keyphrases=sorted(job_keyphrases or set()),
+        job_description_keyphrases=sorted(jd_keyphrases or set()),
         supplemental_keyphrases=sorted(supplemental_keyphrases or set()),
         alignment_score=round(score, 2),
-        resume_keyword_count=resume_keyword_count,
-        job_keyword_count=job_keyword_count,
-        supplemental_keyword_count=len(supplemental_keywords),
-        supplemental_used=bool(supplemental_keywords & (job_kws.get("required", set()) | job_kws.get("preferred", set()))),
         resume_entities=resume_entities,
-        job_description_entities=extract_domain_entities(job_description),
+        job_description_entities=jd_entities,
         supplemental_entities=extract_domain_entities(supplemental),
-        requirements=requirements,
-        resume_evidence=resume_evidence,
-        requirement_coverage=requirement_coverage,
-        gap_analysis=gap_analysis,
+        alignment_evidence=alignment_evidence,
     )

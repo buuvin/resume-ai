@@ -34,7 +34,7 @@ function renderList(items, emptyLabel, chipClass = "") {
 }
 
 function renderEntities(entities) {
-  const categories = ["languages", "frameworks", "platforms", "tools", "databases"];
+  const categories = ["languages", "frameworks", "platforms", "tools", "databases", "concepts"];
   return categories.map((category) => `
     <h4>${category[0].toUpperCase()}${category.slice(1)}</h4>
     ${renderList((entities || {})[category] || [], "None detected.")}
@@ -67,6 +67,11 @@ function renderResults(payload) {
     <div class="card">
       <h3>Missing skills</h3>
       ${renderList(analysis.missing_skills || [], "No notable gaps were detected.", "missing")}
+    </div>
+
+    <div class="card">
+      <h3>Underrepresented skills</h3>
+      ${renderList(analysis.underrepresented_skills || [], "No partially supported requirements were detected.", "underrepresented")}
     </div>
 
     <div class="card">

@@ -197,7 +197,7 @@ def extract_keyphrases(
     vectorizer = KeyphraseCountVectorizer()
     phrases = keybert_model.extract_keywords(
         text,
-        keyphrase_ngram_range=(1, 3),
+        keyphrase_ngram_range=(2, 4),
         stop_words="english",
         top_n=top_n,
         doc_embeddings=document_embedding,

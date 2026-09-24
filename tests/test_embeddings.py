@@ -19,12 +19,25 @@ class FakeEmbeddingModel:
 
 
 class FakeKeyBERTModel:
-    def extract_keywords(self, text, keyphrase_ngram_range, stop_words, top_n, doc_embeddings):
+    def extract_keywords(
+        self,
+        text,
+        keyphrase_ngram_range,
+        stop_words,
+        top_n,
+        doc_embeddings,
+        use_mmr,
+        diversity,
+        vectorizer,
+    ):
         assert text == "Python data pipelines"
-        assert keyphrase_ngram_range == (1, 3)
+        assert keyphrase_ngram_range == (2, 4)
         assert stop_words == "english"
         assert top_n == 10
         assert doc_embeddings.shape == (1, 2)
+        assert use_mmr is True
+        assert diversity == 0.5
+        assert vectorizer is not None
         return [("data pipelines", 0.9), ("python", 0.8)]
 
 

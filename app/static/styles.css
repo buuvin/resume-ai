@@ -269,6 +269,11 @@ button:disabled {
   color: #92400e;
 }
 
+.chip.underrepresented {
+  background: rgba(87, 101, 122, 0.14);
+  color: var(--muted);
+}
+
 .text-block {
   margin: 0;
   line-height: 1.7;

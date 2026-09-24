@@ -49,7 +49,7 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
         job_description_text,
         supplemental_text,
         resume_keyphrases=set(keyphrases.get("resume", [])),
-        job_keyphrases=set(keyphrases.get("job description", [])),
+        jd_keyphrases=set(keyphrases.get("job description", [])),
         supplemental_keyphrases=set(keyphrases.get("supplemental", [])),
         bullet_similarity=bullet_similarity,
     )

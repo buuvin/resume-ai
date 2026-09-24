@@ -1,66 +1,48 @@
-from types import SimpleNamespace
-
-from app.services.analysis import build_optimization_analysis, normalize_optimization_evidence
+from app.services.analysis import _alignment_normalize, alignment_machine
 
 
-def test_build_optimization_analysis_classifies_coverage_and_actions():
-    requirements, evidence, coverage, gaps = build_optimization_analysis(
-        {
-            "embedding_bullets": {"python", "pandas", "sql"},
-        },
-        {
-            "required": {"python", "sql"},
-            "preferred": {"docker"},
-        },
-    )
-
-    assert [(item.keyword, item.priority) for item in requirements] == [
-        ("python", "required"),
-        ("sql", "required"),
-        ("docker", "preferred"),
-    ]
-    assert coverage[0].status == "covered"
-    assert coverage[0].evidence[0].sections == ["embedding_bullets"]
-    assert coverage[1].status == "underrepresented"
-    assert coverage[2].status == "missing"
-    assert {gap.action for gap in gaps} == {"promote", "augment"}
-    assert {gap.requirement.keyword for gap in gaps} == {"sql", "docker"}
+def test_alignment_normalize_expands_and_canonicalizes_aliases():
+    assert _alignment_normalize("AWS") == "amazon web services"
+    assert _alignment_normalize("AWS Lambda") == "amazon web services"
 
 
-def test_resume_evidence_does_not_include_job_only_requirements():
-    _, evidence, coverage, _ = build_optimization_analysis(
-        {"experience": {"python"}},
-        {"required": {"python", "kubernetes"}, "preferred": set()},
-    )
+def test_alignment_machine_returns_best_evidence_for_each_requirement(monkeypatch):
+    class FakeEmbedding:
+        def __init__(self, vectors):
+            self.embeddings = vectors
 
-    assert [item.keyword for item in evidence] == ["python"]
-    kubernetes_coverage = next(
-        item for item in coverage if item.requirement.keyword == "kubernetes"
-    )
-    assert kubernetes_coverage.status == "missing"
-    assert kubernetes_coverage.evidence == []
-
-
-def test_normalize_optimization_evidence_uses_high_similarity_bullets():
-    result = SimpleNamespace(
-        top_matches=[
-            SimpleNamespace(
-                resume_bullet="Built Python APIs",
-                similarity_score=0.8,
-            ),
-            SimpleNamespace(
-                resume_bullet="Unrelated work",
-                similarity_score=0.4,
-            ),
-        ]
-    )
-
-    assert normalize_optimization_evidence(
-        result,
-        keyphrases={"Python APIs"},
-        entities={"languages": ["python"], "frameworks": ["fastapi"]},
-    ) == {
-        "embedding_bullets": {"built", "python", "apis"},
-        "keyphrases": {"python", "apis"},
-        "entities": {"python", "fastapi"},
+    vectors = {
+        "Python": [1.0, 0.0],
+        "PostgreSQL": [0.0, 1.0],
+        "AWS": [1.0, 0.0],
     }
+
+    def fake_embed_document(text):
+        return FakeEmbedding([vectors[item] for item in text.split("\n")])
+
+    monkeypatch.setattr(
+        "app.services.embeddings.embed_document",
+        fake_embed_document,
+    )
+
+    alignments = alignment_machine(
+        "ner",
+        ["Python", "PostgreSQL"],
+        ["AWS", "PostgreSQL"],
+    )
+
+    assert [(item.requirement, item.evidence) for item in alignments] == [
+        ("AWS", "Python"),
+        ("PostgreSQL", "PostgreSQL"),
+    ]
+    assert [item.alignment for item in alignments] == [1.0, 1.0]
+    assert [item.exact_match for item in alignments] == [False, True]
+
+
+def test_alignment_machine_rejects_unknown_sources():
+    try:
+        alignment_machine("keywords", ["Python"], ["Python"])
+    except ValueError as error:
+        assert str(error) == "source must be 'ner', 'keybert', or 'bulletpoints'"
+    else:
+        raise AssertionError("alignment_machine accepted an unknown source")

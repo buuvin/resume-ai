@@ -3,8 +3,22 @@ from io import BytesIO
 from reportlab.pdfgen import canvas
 from fastapi.testclient import TestClient
 from app.main import app
+from app.services.analysis import extract_domain_entities
 
 client = TestClient(app)
+
+
+def test_domain_entities_include_ai_engineering_concepts():
+    entities = extract_domain_entities(
+        "Built an NLP system with an LLM using retrieval augmented generation for data science."
+    )
+
+    assert entities["concepts"] == [
+        "data science",
+        "large language model",
+        "natural language processing",
+        "retrieval augmented generation",
+    ]
 
 
 def make_pdf(text):
@@ -30,18 +44,16 @@ def test_analyze_endpoint():
     assert "analysis" in data
     assert "improvements" in data
     assert isinstance(data["analysis"]["matched_skills"], list)
+    assert isinstance(data["analysis"]["underrepresented_skills"], list)
     assert isinstance(data["analysis"]["missing_skills"], list)
     assert isinstance(data["analysis"]["alignment_score"], float)
-    assert isinstance(data["analysis"]["resume_keyword_count"], int)
-    assert isinstance(data["analysis"]["job_keyword_count"], int)
-    assert isinstance(data["analysis"]["supplemental_keyword_count"], int)
-    assert isinstance(data["analysis"]["supplemental_used"], bool)
     assert data["analysis"]["resume_entities"]["languages"] == ["python"]
     assert data["analysis"]["job_description_entities"]["languages"] == ["python"]
     assert data["analysis"]["supplemental_entities"]["databases"] == []
-    assert data["analysis"]["supplemental_keyword_count"] > 0
-    assert data["analysis"]["supplemental_used"] is True
-    assert "sql" in data["analysis"]["matched_skills"]
+    assert {item["source"] for item in data["analysis"]["alignment_evidence"]} == {
+        "ner",
+        "keybert",
+    }
     assert data["improvements"]["rewritten_summary"]
     assert data["improvements"]["rewritten_bullets"] == []
     assert data["improvements"]["explanations"]
@@ -63,4 +75,4 @@ def test_analyze_upload_extracts_pdf_resume():
     )
 
     assert response.status_code == 200
-    assert "python" in response.json()["analysis"]["matched_skills"]
+    assert response.json()["analysis"]["alignment_evidence"]
