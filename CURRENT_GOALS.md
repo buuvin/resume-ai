@@ -34,8 +34,17 @@ What is implemented (summary)
 
 Short-term next tasks (prioritized)
 
-1. Gap detection to understand where the resume falters compared to the jd, eventually feeds into LLM to better fine tune the resume
-2. Develop a structure for utilizing embeddings, keybert keyphrases, and NER entities to determine whether requirements from the job description are met. Current implementation derives keywords to determine whether requirements are met. Next step should be to implement semantic understnading to see how the most relevant resume evidence relates to the requirements through embeddings as well.
+1. Alignment evidence plan
+Use only job-description bullets under the requirements section as requirements.
+Collect resume evidence from NER entities, KeyBERT phrases, and resume bullet points.
+Compare every resume evidence source against every JD requirement bullet.
+For each requirement, retain the strongest evidence pieces, potentially multiple, rather than only one.
+Allow evidence to come from any combination of the three sources; a source does not need to contribute evidence.
+Store each selected evidence piece as its own AlignmentEvidence object with its source, text, similarity, and exact-match status.
+Rank or group the evidence by requirement so downstream optimization can see the strongest supporting and weakest supporting evidence.
+Return an empty evidence result only when no resume source produces a usable match.
+Update scoring so requirement alignment is based on the selected evidence set without allowing duplicate or redundant evidence to inflate the score.
+Add tests for multiple strong matches, mixed-source evidence, empty sources, and duplicate evidence.
 
 Long-term goals:
 

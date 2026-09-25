@@ -2,6 +2,7 @@ FROM python:3.10-slim
 
 # System dependencies for PDF/DOCX parsing
 RUN apt-get update && apt-get install -y \
+    --no-install-recommends git\
     build-essential \
     poppler-utils \
     libxml2 \
