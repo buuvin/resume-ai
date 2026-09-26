@@ -39,7 +39,7 @@ Use only job-description bullets under the requirements section as requirements.
 Collect resume evidence from NER entities, KeyBERT phrases, and resume bullet points.
 Compare every resume evidence source against every JD requirement bullet.
 For each requirement, retain the strongest evidence pieces, potentially multiple, rather than only one.
-Allow evidence to come from any combination of the three sources; a source does not need to contribute evidence.
+Allow evidence to come from any combination of the three sources; a source does not need to contribute evidence. 
 Store each selected evidence piece as its own AlignmentEvidence object with its source, text, similarity, and exact-match status.
 Rank or group the evidence by requirement so downstream optimization can see the strongest supporting and weakest supporting evidence.
 Return an empty evidence result only when no resume source produces a usable match.

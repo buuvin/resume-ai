@@ -7,7 +7,11 @@ from app.services.embeddings import (
 )
 from app.services.ingestion import extract_upload_text
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from app.services.analysis import analyze_resume
+from app.services.analysis import (
+    analyze_resume,
+    write_alignment_evidence,
+    write_resume_evidence,
+)
 
 router = APIRouter()
 
@@ -35,7 +39,10 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
             #         flush=True,
             #     )
         bullet_similarity = compare_bullet_embeddings(
-            resume_text, job_description_text
+            resume_text,
+            job_description_text,
+            job_section_names={"requirements"},
+            job_minimum_words=1,
         )
         print_bullet_similarity(bullet_similarity)
     except ModuleNotFoundError as error:
@@ -52,6 +59,12 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
         jd_keyphrases=set(keyphrases.get("job description", [])),
         supplemental_keyphrases=set(keyphrases.get("supplemental", [])),
         bullet_similarity=bullet_similarity,
+    )
+    write_alignment_evidence(analysis.alignment_evidence)
+    write_resume_evidence(
+        analysis.resume_entities.model_dump(),
+        analysis.resume_keyphrases,
+        getattr(bullet_similarity, "resume_bullets", []),
     )
     if analysis.missing_skills:
         top_gap_list = ", ".join(analysis.missing_skills[:3])

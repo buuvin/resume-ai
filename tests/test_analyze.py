@@ -32,7 +32,7 @@ def make_pdf(text):
 def test_analyze_endpoint():
     payload = {
         "resume_text": "I built machine learning models using Python and pandas.",
-        "job_description_text": "Looking for Python, machine learning, and SQL experience.",
+        "job_description_text": "Requirements\nPython\nMachine learning model development\nSQL experience",
         "supplemental_text": "Built SQL data pipelines for analytics.",
     }
 
@@ -50,10 +50,18 @@ def test_analyze_endpoint():
     assert data["analysis"]["resume_entities"]["languages"] == ["python"]
     assert data["analysis"]["job_description_entities"]["languages"] == ["python"]
     assert data["analysis"]["supplemental_entities"]["databases"] == []
-    assert {item["source"] for item in data["analysis"]["alignment_evidence"]} == {
-        "ner",
-        "keybert",
-    }
+    assert data["analysis"]["alignment_evidence"]
+    assert {
+        item["source"] for item in data["analysis"]["alignment_evidence"]
+    } <= {"ner", "keybert", "bulletpoints"}
+    assert all(
+        item["requirement"] in {
+            "Python",
+            "Machine learning model development",
+            "SQL experience",
+        }
+        for item in data["analysis"]["alignment_evidence"]
+    )
     assert data["improvements"]["rewritten_summary"]
     assert data["improvements"]["rewritten_bullets"] == []
     assert data["improvements"]["explanations"]

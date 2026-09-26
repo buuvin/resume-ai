@@ -1,5 +1,7 @@
+import json
 import re
 import unicodedata
+from pathlib import Path
 
 import numpy as np
 
@@ -112,6 +114,12 @@ SYNONYMS = {
 
 MATCHED_ALIGNMENT_THRESHOLD = 0.70
 UNDERREPRESENTED_ALIGNMENT_THRESHOLD = 0.45
+ALIGNMENT_EVIDENCE_OUTPUT = (
+    Path(__file__).resolve().parents[2] / "output" / "alignment_evidence.json"
+)
+RESUME_EVIDENCE_OUTPUT = (
+    Path(__file__).resolve().parents[2] / "output" / "resume_evidence.json"
+)
 
 def clean_text(text: str) -> str:
     # Normalize visually similar Unicode characters so matching is consistent across copy/pasted text.
@@ -226,61 +234,150 @@ def _alignment_normalize(text: str) -> str:
 
 
 def alignment_machine(
-    source: str,
-    evidence: list[str],
-    requirement: list[str],
+    resume_evidence: dict[str, list[str]],
+    requirements: list[str],
+    max_evidence_per_requirement: int = 3,
 ) -> list[AlignmentEvidence]:
-    """Match every job requirement to its strongest same-source resume evidence."""
-    if source not in {"ner", "keybert", "bulletpoints"}:
-       raise ValueError("source must be 'ner', 'keybert', or 'bulletpoints'")
+    """Match each JD requirement to its strongest resume evidence across sources."""
+    valid_sources = {"ner", "keybert", "bulletpoints"}
+    unknown_sources = set(resume_evidence) - valid_sources
+    if unknown_sources:
+        raise ValueError("resume_evidence contains an unknown source")
 
     from app.services.embeddings import embed_document
 
-    evidence_strings = _unique_strings(evidence)
-    requirement_strings = _unique_strings(requirement)
-    if not requirement_strings:
+    requirement_strings = _unique_strings(requirements)
+    if not requirement_strings or max_evidence_per_requirement < 1:
         return []
 
-    evidence_document = embed_document("\n".join(evidence_strings))
     requirement_document = embed_document("\n".join(requirement_strings))
-    evidence_vectors = np.asarray(evidence_document.embeddings, dtype=float)
     requirement_vectors = np.asarray(requirement_document.embeddings, dtype=float)
+    candidates_by_requirement = {item: [] for item in requirement_strings}
 
-    if not evidence_strings or evidence_vectors.size == 0:
-        return [
-            AlignmentEvidence(
-                source=source,
-                requirement=item,
-                evidence="",
-                alignment=0.0,
-                exact_match=False,
-            )
-            for item in requirement_strings
-        ]
+    for source in ("ner", "keybert", "bulletpoints"):
+        evidence_strings = _unique_strings(resume_evidence.get(source))
+        if not evidence_strings:
+            continue
 
-    similarity_matrix = np.clip(requirement_vectors @ evidence_vectors.T, -1.0, 1.0)
+        evidence_document = embed_document("\n".join(evidence_strings))
+        evidence_vectors = np.asarray(evidence_document.embeddings, dtype=float)
+        if evidence_vectors.size == 0:
+            continue
+
+        similarity_matrix = np.clip(requirement_vectors @ evidence_vectors.T, -1.0, 1.0)
+        for requirement_index, requirement_item in enumerate(requirement_strings):
+            for evidence_index, evidence_item in enumerate(evidence_strings):
+                candidates_by_requirement[requirement_item].append(
+                    AlignmentEvidence(
+                        source=source,
+                        requirement=requirement_item,
+                        evidence=evidence_item,
+                        alignment=float(similarity_matrix[requirement_index, evidence_index]),
+                        exact_match=(
+                            _alignment_normalize(requirement_item)
+                            == _alignment_normalize(evidence_item)
+                        ),
+                    )
+                )
+
     alignments = []
-    for index, requirement_item in enumerate(requirement_strings):
-        evidence_index = int(np.argmax(similarity_matrix[index]))
-        evidence_item = evidence_strings[evidence_index]
-        alignments.append(
-            AlignmentEvidence(
-                source=source,
-                requirement=requirement_item,
-                evidence=evidence_item,
-                alignment=float(similarity_matrix[index, evidence_index]),
-                exact_match=(
-                    _alignment_normalize(requirement_item)
-                    == _alignment_normalize(evidence_item)
-                ),
-            )
+    for requirement_item in requirement_strings:
+        candidates = sorted(
+            candidates_by_requirement[requirement_item],
+            key=lambda item: item.alignment,
+            reverse=True,
         )
+        selected = []
+        seen_evidence = set()
+        for candidate in candidates:
+            normalized_evidence = _alignment_normalize(candidate.evidence)
+            if (
+                candidate.alignment < UNDERREPRESENTED_ALIGNMENT_THRESHOLD
+                or normalized_evidence in seen_evidence
+            ):
+                continue
+            selected.append(candidate)
+            seen_evidence.add(normalized_evidence)
+            if len(selected) >= max_evidence_per_requirement:
+                break
+
+        if selected:
+            alignments.extend(selected)
+        else:
+            alignments.append(
+                AlignmentEvidence(
+                    source="bulletpoints",
+                    requirement=requirement_item,
+                    evidence="",
+                    alignment=0.0,
+                    exact_match=False,
+                )
+            )
     return alignments
 
 
 def _flatten_entities(entities: dict[str, list[str]]) -> list[str]:
     return _unique_strings(
         [entity for category in entities.values() for entity in category]
+    )
+
+
+def write_alignment_evidence(
+    alignment_evidence: list[AlignmentEvidence],
+    output_path: Path = ALIGNMENT_EVIDENCE_OUTPUT,
+) -> None:
+    """Write all requirement evidence once after alignment has completed."""
+    evidence_by_requirement = {}
+    for item in alignment_evidence:
+        evidence_by_requirement.setdefault(item.requirement, []).append(
+            {
+                "source": item.source,
+                "evidence": item.evidence,
+                "alignment": item.alignment,
+                "exact_match": item.exact_match,
+            }
+        )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(
+            {
+                "requirements": [
+                    {
+                        "requirement": requirement,
+                        "evidence": evidence,
+                    }
+                    for requirement, evidence in evidence_by_requirement.items()
+                ]
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_resume_evidence(
+    resume_entities: dict[str, list[str]],
+    resume_keyphrases: list[str] | set[str],
+    resume_bullets: list[str],
+    output_path: Path = RESUME_EVIDENCE_OUTPUT,
+) -> None:
+    """Write all collected resume evidence without requirement alignment data."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(
+            {
+                "resume_evidence": {
+                    "ner": resume_entities,
+                    "keybert": _unique_strings(resume_keyphrases),
+                    "bulletpoints": _unique_strings(resume_bullets),
+                }
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
     )
 
 
@@ -326,19 +423,13 @@ def analyze_resume(
     resume_entities = extract_domain_entities(resume)
     jd_entities = extract_domain_entities(job_description)
 
-    alignment_evidence = []
-    alignment_evidence.extend(
-        alignment_machine("ner", _flatten_entities(resume_entities), _flatten_entities(jd_entities))
-    )
-    alignment_evidence.extend(
-        alignment_machine("keybert", list(resume_keyphrases or []), list(jd_keyphrases or []))
-    )
-    alignment_evidence.extend(
-        alignment_machine(
-            "bulletpoints",
-            getattr(bullet_similarity, "resume_bullets", []),
-            getattr(bullet_similarity, "job_description_bullets", []),
-        )
+    alignment_evidence = alignment_machine(
+        {
+            "ner": _flatten_entities(resume_entities),
+            "keybert": list(resume_keyphrases or []),
+            "bulletpoints": getattr(bullet_similarity, "resume_bullets", []),
+        },
+        getattr(bullet_similarity, "job_description_bullets", []),
     )
 
     matched, underrepresented, missing, score = _summarize_alignment(alignment_evidence)

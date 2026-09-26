@@ -37,7 +37,11 @@ def split_document_lines(text: str) -> list[str]:
     return [line.strip() for line in (text or "").splitlines() if line.strip()]
 
 
-def extract_bullet_points(text: str, section_names: set[str]) -> list[str]:
+def extract_bullet_points(
+    text: str,
+    section_names: set[str],
+    minimum_words: int = 3,
+) -> list[str]:
     """Return parsed section lines containing more than two words.
 
     The historical name is retained for compatibility. Section membership and line
@@ -51,7 +55,7 @@ def extract_bullet_points(text: str, section_names: set[str]) -> list[str]:
             continue
         for line in section_text.splitlines():
             cleaned_line = line.strip()
-            if len(cleaned_line.split()) > 2:
+            if len(cleaned_line.split()) >= minimum_words:
                 bullets.append(cleaned_line)
     return bullets
 
@@ -86,13 +90,17 @@ def compare_bullet_embeddings(
     job_description_text: str,
     model: Any | None = None,
     top_n: int = 5,
+    job_section_names: set[str] | None = None,
+    job_minimum_words: int = 3,
 ) -> BulletSimilarityResult:
     """Compare resume experience/project bullets with job requirement bullets."""
     resume_bullets = extract_bullet_points(
         resume_text, {"experience", "projects", "skills"}
     )
     job_bullets = extract_bullet_points(
-        job_description_text, {"requirements", "preferred", "skills"}
+        job_description_text,
+        job_section_names or {"requirements", "preferred", "skills"},
+        minimum_words=job_minimum_words,
     )
     if not resume_bullets or not job_bullets:
         return BulletSimilarityResult(

@@ -1,0 +1,136 @@
+{
+  "cases": [
+    {
+      "case_id": "genai_engineer_python",
+      "title": "GenAI Engineer (Python)",
+      "location": "Palo Alto, CA",
+      "job_description": "GenAI Engineer (Python)\nPalo Alto, CA\n\nAbout Us:\nWe are an innovative tech startup building Generative AI tools for professional services.\n\nRole Overview:\nWe are looking for a motivated Software Developer to develop, test, and refine products that use Generative AI to automate complex tasks.\n\nKey Responsibilities:\n- Hands-on Development: Work with our team to develop and test AI-powered software solutions.\n- Collaborate: Partner with product managers, senior developers, and industry experts to understand project goals and deliver effective solutions.\n- Problem-Solving: Support the team in troubleshooting challenges, brainstorming solutions, and refining features to improve performance.\n- Learn and Grow: Gain experience with AI tools, frameworks, and cloud platforms under the guidance of senior team members.\n- Stay Updated: Keep learning about AI, machine learning, and software development to grow your skills.\n\nQualifications:\n\nEducation:\n- Bachelor's or Master's degree in Computer Science, Engineering, or a related field.\n\nTechnical Skills:\n- Proficiency in Python and libraries such as PyTorch, Pandas, NumPy, or similar.\n- Familiarity with fundamental concepts in data structures and algorithms.\n\nPreferred:\n- Experience with LLMs from OpenAI, Anthropic, Google, or Meta and their application in chatbots, RAG systems, and agents.\n- Experience with Cloud development, preferably Azure (e.g., Azure App Service, Azure Functions, Azure Database Services, Azure AI services, and Azure Search).\n\nSoft Skills:\n- Ability to communicate and work well in a team.\n- Attention to detail and a proactive approach to problem-solving.\n- Enthusiasm for technology and a passion for innovation.\n- Willingness to learn and adapt quickly.",
+      "expected_requirements": [
+        "Bachelor's or Master's degree in Computer Science, Engineering, or a related field.",
+        "Proficiency in Python and libraries such as PyTorch, Pandas, NumPy, or similar.",
+        "Familiarity with fundamental concepts in data structures and algorithms."
+      ],
+      "expected_preferred": [
+        "Experience with LLMs from OpenAI, Anthropic, Google, or Meta and their application in chatbots, RAG systems, and agents.",
+        "Experience with Cloud development, preferably Azure (e.g., Azure App Service, Azure Functions, Azure Database Services, Azure AI services, and Azure Search).",
+        "Ability to communicate and work well in a team.",
+        "Attention to detail and a proactive approach to problem-solving.",
+        "Enthusiasm for technology and a passion for innovation.",
+        "Willingness to learn and adapt quickly."
+      ]
+    },
+    {
+      "case_id": "data_scientist_altera",
+      "title": "Data Scientist",
+      "company": "Altera",
+      "location": "Bay Area, California",
+      "job_description": "Data Scientist\n\nJob Description:\n\nAltera is empowering the future of intelligent computing through programmable solutions that accelerate innovation across cloud, communications, industrial, automotive, aerospace, defense, and edge applications.\n\nPosition Summary\nAltera is seeking two Data Scientists to support AI and business intelligence initiatives. The role combines data science, generative AI, analytics engineering, and visualization to turn complex business requirements into practical, scalable solutions.\n\nKey Responsibilities\n- Analyze structured and unstructured data to identify trends, opportunities, and actionable business insights.\n- Develop predictive models, forecasting tools, and machine learning solutions to support strategic and operational decision-making.\n- Design, build, and maintain data pipelines, analytical models, dashboards, and visualizations.\n- Design, build, test, and maintain data pipelines, analytical models, dashboards, and AI-powered workflows using Databricks and related cloud data platforms.\n- Partner with stakeholders across Finance, Sales, Operations, Marketing, HR, and Engineering to understand business needs and translate them into analytical solutions.\n- Create compelling presentations and data stories that effectively communicate findings to technical and non-technical audiences, including executive leadership.\n- Partner with end users to gather requirements, develop prototypes, conduct user acceptance testing, incorporate feedback, document solutions, and support adoption of new AI and BI capabilities.\n- Identify data quality issues, model limitations, hallucination risks, anomalies, and inconsistencies while supporting improvements to data governance, AI governance, reporting accuracy, access controls, and solution documentation.\n- Collaborate with data engineers and technology teams to develop scalable analytics solutions and deploy models into production environments.\n- Prototype and evaluate generative AI solutions, including natural-language analytics, retrieval-augmented generation, AI assistants, and workflow automation, with appropriate testing for accuracy, reliability, security, and business value.\n- Contribute to the development of analytical best practices, coding standards, and data science methodologies across the organization.\n- Evaluate and integrate emerging technologies, tools, and AI capabilities to advance data and analytics maturity.\n\nQualifications:\n\nMinimum Qualifications\n- Bachelor's Degree in Data Science, Computer Science, Statistics, Mathematics, Economics, Operations Research, Business Analytics, Engineering, or a related quantitative field completed by the start date.\n- 1+ year of relevant experience demonstrated through internships, co-ops, research, academic projects, or professional work.\n- Proficiency in Python and SQL demonstrated through coursework, internships, research, or personal projects, with the ability to learn new data and AI tools quickly.\n- Experience with statistical analysis, machine learning, data visualization, or business intelligence through coursework, projects, or internships.\n- Strong analytical and problem-solving skills with the ability to work with large and complex datasets.\n- Excellent written, verbal, and presentation communication skills.\n- Ability to work effectively in a collaborative, cross-functional environment.\n\nPreferred Qualifications\n- Curiosity, sound technical judgment, and the ability to compare emerging AI tools based on accuracy, security, scalability, usability, and business value.\n- Foundational experience with Databricks through coursework, certification, internships, or academic projects, including notebooks, SQL, Delta Lake concepts, data pipelines, and machine learning or AI workflows.\n- Familiarity with machine learning frameworks and libraries such as Scikit-learn, TensorFlow, or PyTorch.\n- Experience using Git or other version control systems.\n- Knowledge of forecasting, scenario modeling, financial analytics, revenue operations, or business performance measurement.\n- Exposure to AI, generative AI, large language models (LLMs), or advanced analytics applications.\n- Experience with Power BI or a comparable business intelligence platform, including data modeling, dashboard development, KPI reporting, or interactive analytics through coursework, projects, or internships.\n- Understanding of semiconductor, manufacturing, supply chain, or technology industry data environments.\n\nWhat You will Gain\n- Hands-on experience applying advanced analytics and AI to real-world business challenges.\n- Exposure to executive decision-making and strategic initiatives across a leading semiconductor company.\n- Opportunities to work with modern cloud, data, and AI technologies.\n- Career growth within a fast-paced, high-growth organization shaping the future of programmable computing.",
+      "expected_requirements": [
+        "Bachelor's Degree in Data Science, Computer Science, Statistics, Mathematics, Economics, Operations Research, Business Analytics, Engineering, or a related quantitative field completed by the start date.",
+        "1+ year of relevant experience demonstrated through internships, co-ops, research, academic projects, or professional work.",
+        "Proficiency in Python and SQL demonstrated through coursework, internships, research, or personal projects, with the ability to learn new data and AI tools quickly.",
+        "Experience with statistical analysis, machine learning, data visualization, or business intelligence through coursework, projects, or internships.",
+        "Strong analytical and problem-solving skills with the ability to work with large and complex datasets.",
+        "Excellent written, verbal, and presentation communication skills.",
+        "Ability to work effectively in a collaborative, cross-functional environment."
+      ],
+      "expected_preferred": [
+        "Curiosity, sound technical judgment, and the ability to compare emerging AI tools based on accuracy, security, scalability, usability, and business value.",
+        "Foundational experience with Databricks through coursework, certification, internships, or academic projects, including notebooks, SQL, Delta Lake concepts, data pipelines, and machine learning or AI workflows.",
+        "Familiarity with machine learning frameworks and libraries such as Scikit-learn, TensorFlow, or PyTorch.",
+        "Experience using Git or other version control systems.",
+        "Knowledge of forecasting, scenario modeling, financial analytics, revenue operations, or business performance measurement.",
+        "Exposure to AI, generative AI, large language models (LLMs), or advanced analytics applications.",
+        "Experience with Power BI or a comparable business intelligence platform, including data modeling, dashboard development, KPI reporting, or interactive analytics through coursework, projects, or internships.",
+        "Understanding of semiconductor, manufacturing, supply chain, or technology industry data environments."
+      ]
+    },
+    {
+      "case_id": "ai_engineer_memverge",
+      "title": "AI Engineer",
+      "company": "MemVerge",
+      "job_description": "About the job\n\nAbout MemVerge & The Role\n\nMemVerge is building next-generation AI infrastructure and personal AI software. Our MemoryBox platform gives AI systems persistent, portable, and user-controlled memory across applications, conversations, and AI models.\n\nWe are looking for an AI Engineer who is curious, hands-on, and excited to build with the latest AI technologies. You will work alongside experienced engineers to develop LLM, RAG, AI agent, memory, search, and personalization capabilities and turn experiments into real product features.\n\nWhat You will Do\n- Build and improve LLM-powered features for MemoryBox.\n- Prototype with RAG, embeddings, semantic search, memory, and AI agents.\n- Experiment, evaluate results, diagnose failures, and improve AI system performance.\n- Turn promising ideas into reliable production features.\n- Collaborate with experienced engineers while quickly taking ownership of your work.\n\nWhat We are Looking For\n- Strong programming skills in Python; experience with Rust and/or Go is a plus.\n- Proficient use of AI coding agents and an AI-native approach to building software.\n- Familiarity with LLMs, APIs, prompting, embeddings, RAG, or AI agents.\n- Strong software engineering fundamentals and problem-solving ability.\n- Evidence that you build things through work, internships, research, open source, hackathons, or personal projects.\n- Curiosity, initiative, and the ability to learn and experiment quickly.\n\nBonus Points\n- Experience with PyTorch, Hugging Face, LangChain, LlamaIndex, vector databases, cloud infrastructure, or open-source LLMs. We especially value a GitHub, portfolio, or project that shows us what you can build.",
+      "expected_requirements": [
+        "Build and improve LLM-powered features for MemoryBox.",
+        "Prototype with RAG, embeddings, semantic search, memory, and AI agents.",
+        "Experiment, evaluate results, diagnose failures, and improve AI system performance.",
+        "Turn promising ideas into reliable production features.",
+        "Collaborate with experienced engineers while quickly taking ownership of your work.",
+        "Strong programming skills in Python; experience with Rust and/or Go is a plus.",
+        "Proficient use of AI coding agents and an AI-native approach to building software.",
+        "Familiarity with LLMs, APIs, prompting, embeddings, RAG, or AI agents.",
+        "Strong software engineering fundamentals and problem-solving ability.",
+        "Evidence that you build things through work, internships, research, open source, hackathons, or personal projects.",
+        "Curiosity, initiative, and the ability to learn and experiment quickly."
+      ],
+      "expected_preferred": [
+        "Experience with PyTorch, Hugging Face, LangChain, LlamaIndex, vector databases, cloud infrastructure, or open-source LLMs. We especially value a GitHub, portfolio, or project that shows us what you can build."
+      ]
+    },
+    {
+      "case_id": "machine_learning_engineer_rzr_global",
+      "title": "Machine Learning Engineer",
+      "company": "RZR Global",
+      "location": "San Francisco",
+      "job_description": "Machine Learning Engineer\nSan Francisco\n\nWho are we?\n\nRZR Global is an AI-driven company specializing in mobile advertising solutions designed to fuel revenue growth. We leverage AI to discover audiences in a privacy-first environment through trillions of contextual bidding signals and proprietary behavioral models. Our audience engagement platform includes creative strategy and execution. We handle 5 million mobile ad requests per second from over 10 billion devices, driving performance for both publishers and brands. We are headquartered in San Francisco, CA, with a global presence across the United States, EMEA, and APAC.\n\nRole Overview\n\nWe are seeking a motivated and detail-oriented Machine Learning Engineer to join our team. As an ML Engineer, you will be involved in designing and implementing machine learning models and data pipelines to enhance our programmatic demand-side platform (DSP). You will work closely with Senior MLE and other team members to drive impactful machine learning projects and contribute to innovative solutions.\n\nKey Responsibilities\n- Support the development of machine learning models to address challenges in programmatic advertising, such as predicting user responses, forecasting bid landscapes, and detecting fraud.\n- Collaborate with senior data scientists and cross-functional teams (product, engineering, and analytics) to integrate models into production workflows.\n- Analyze the impact of integrating new data sources and features into our models.\n- Build and maintain data pipelines to process and prepare large datasets for model training and evaluation.\n- Contribute ideas and assist in testing new tools, methodologies, and technologies to improve our machine learning capabilities.\n- Document experiments, assumptions, and outcomes; maintain reproducibility.\n\nRequired Skills / Experience\n- Bachelor's or Master's degree in Mathematics, Physics, Computer Science, or a related technical field.\n- At least 1 year of professional experience in machine learning, statistical analysis, and data analysis.\n- Experience with machine learning techniques such as regression, classification, and clustering.\n- Proficiency in Python and SQL and familiarity with big data tools (e.g., Spark) and ML libraries (e.g., TensorFlow, PyTorch, Scikit-Learn).\n- Strong grasp of probability, statistics, and data analysis principles.\n- Ability to work effectively in a team environment, with good communication skills to explain complex concepts to diverse stakeholders.\n\nNice-to-Have\n- Familiarity with system programming languages including C++ and Rust is a plus.\n- Exposure to online inference systems, gRPC/REST model endpoints, or streaming features (Kafka/Flink).\n- Ad-tech familiarity: auction dynamics, pacing, fraud signals, creative personalization.",
+      "expected_requirements": [
+        "Support the development of machine learning models to address challenges in programmatic advertising, such as predicting user responses, forecasting bid landscapes, and detecting fraud.",
+        "Collaborate with senior data scientists and cross-functional teams (product, engineering, and analytics) to integrate models into production workflows.",
+        "Analyze the impact of integrating new data sources and features into our models.",
+        "Build and maintain data pipelines to process and prepare large datasets for model training and evaluation.",
+        "Contribute ideas and assist in testing new tools, methodologies, and technologies to improve our machine learning capabilities.",
+        "Document experiments, assumptions, and outcomes; maintain reproducibility.",
+        "Bachelor's or Master's degree in Mathematics, Physics, Computer Science, or a related technical field.",
+        "At least 1 year of professional experience in machine learning, statistical analysis, and data analysis.",
+        "Experience with machine learning techniques such as regression, classification, and clustering.",
+        "Proficiency in Python and SQL and familiarity with big data tools (e.g., Spark) and ML libraries (e.g., TensorFlow, PyTorch, Scikit-Learn).",
+        "Strong grasp of probability, statistics, and data analysis principles.",
+        "Ability to work effectively in a team environment, with good communication skills to explain complex concepts to diverse stakeholders."
+      ],
+      "expected_preferred": [
+        "Familiarity with system programming languages including C++ and Rust is a plus.",
+        "Exposure to online inference systems, gRPC/REST model endpoints, or streaming features (Kafka/Flink).",
+        "Ad-tech familiarity: auction dynamics, pacing, fraud signals, creative personalization."
+      ]
+    },
+    {
+      "case_id": "ai_data_science_engineer_i",
+      "title": "AI/Data Science Engineer I",
+      "job_description": "About the Role\n\nThis AI/Data Science Engineer I role is focused on delivering intelligent analytics and AI-powered solutions that turn complex data into actionable insights and drive better decisions across the organization. This role blends applied data science with modern AI engineering practices, and the ideal candidate is a curious, technically strong data scientist who brings solid Python and analytical foundations, can build and deploy end-to-end solutions in cloud environments, and is eager to leverage cutting-edge AI tools to accelerate impact.\n\nResponsibilities may include the following and other duties may be assigned.\n\n- Partner with engineers and scientists to design, build, and deploy AI-powered applications and analytical pipelines that translate complex datasets into actionable insights\n- Develop, deploy, and maintain machine learning models and AI services to cloud environments (AWS, Azure, or GCP), including API development and model serving infrastructure\n- Write clean, production-quality Python code and build SQL-based data models across cloud data warehouse environments, including ETL/ELT pipeline development\n- Prototype and iterate on ML models (classification, regression, anomaly detection, NLP) to support predictive analytics use cases\n- Actively leverage AI-assisted development tools (e.g., Windsurf, GitHub Copilot, Cursor) to improve development velocity, code quality, and solution design\n- Communicate findings clearly to both technical and non-technical stakeholders through polished visualizations, reports, and presentations\n- Contribute to data and AI infrastructure strategy, including schema design, data governance, and cloud architecture best practices\n\nRequired Qualifications\n\n- Bachelor's degree in Computer Science, Data Science, Statistics, Engineering, or related field and 0 years of experience.\n\nPreferred Qualifications\n\n- Hands-on experience in data science, AI/ML, or related roles.\n- Python: Proficient in Python for data science and analytical development, including pandas, NumPy, and data visualization libraries (matplotlib, seaborn, plotly)\n- AI/ML: Foundational experience building and evaluating ML models using scikit-learn, PyTorch, or TensorFlow\n- Cloud: Hands-on experience working with cloud platforms (AWS, Azure, or GCP) - e.g., cloud storage, compute, serverless functions, or managed ML services\n- SQL: Proficiency in SQL - joins, aggregations, filtering, and basic query optimization\n- Software Engineering: Understanding of software engineering fundamentals - version control (Git), code modularity, testing, and CI/CD concepts\n- Statistics: Working knowledge of foundational statistical concepts - hypothesis testing, distributions, regression, and sampling methods applied to real-world datasets\n- Communication: Ability to translate technical findings into clear, actionable insights for cross-functional audiences\n- LLMs / Generative AI: Familiarity with large language model APIs (OpenAI, Anthropic, etc.), prompt engineering, or building LLM-powered data workflows - strongly preferred\n- AI Dev Tools: Active use of AI-assisted coding environments such as Windsurf, GitHub Copilot, or Cursor as part of the daily development workflow - strongly preferred\n- Cloud Deployment: Hands-on experience containerizing and deploying models using Docker, Kubernetes, or cloud-native ML services (SageMaker, Azure ML, Vertex AI) - strongly preferred\n- Agentic AI Stack: Familiarity with tools and frameworks used to develop, orchestrate, and monitor agentic AI systems, including:\n- Agent frameworks (e.g., LangGraph, AutoGen)\n- Model, retrieval, and memory tooling (e.g., Hugging Face Transformers, Pinecone)\n- Evaluation, guardrails, and observability (e.g., LangSmith, Ragas)\n- MCP (Model Context Protocol): Awareness of or hands-on experience with MCP to connect AI models to external tools, databases, or APIs\n- API Development: Experience building REST APIs or microservices using FastAPI, Flask, or similar frameworks to serve ML models or data products\n- Data Warehousing: Exposure to platforms such as Snowflake, Databricks, BigQuery, or Azure Synapse\n- Advanced Statistics: Familiarity with multivariate analysis, survival analysis, or statistical process control (SPC)\n- BI Tools: Exposure to Power BI, Tableau, or similar dashboard and reporting platforms\n- Data Storytelling: A passion for turning complex data into compelling narratives that drive action\n- Medtech / Healthcare: Experience or genuine interest in medical technology, clinical studies, or healthcare data",
+      "expected_requirements": [
+        "Partner with engineers and scientists to design, build, and deploy AI-powered applications and analytical pipelines that translate complex datasets into actionable insights",
+        "Develop, deploy, and maintain machine learning models and AI services to cloud environments (AWS, Azure, or GCP), including API development and model serving infrastructure",
+        "Write clean, production-quality Python code and build SQL-based data models across cloud data warehouse environments, including ETL/ELT pipeline development",
+        "Prototype and iterate on ML models (classification, regression, anomaly detection, NLP) to support predictive analytics use cases",
+        "Actively leverage AI-assisted development tools (e.g., Windsurf, GitHub Copilot, Cursor) to improve development velocity, code quality, and solution design",
+        "Communicate findings clearly to both technical and non-technical stakeholders through polished visualizations, reports, and presentations",
+        "Contribute to data and AI infrastructure strategy, including schema design, data governance, and cloud architecture best practices",
+        "Bachelor's degree in Computer Science, Data Science, Statistics, Engineering, or related field and 0 years of experience."
+      ],
+      "expected_preferred": [
+        "Hands-on experience in data science, AI/ML, or related roles.",
+        "Python: Proficient in Python for data science and analytical development, including pandas, NumPy, and data visualization libraries (matplotlib, seaborn, plotly)",
+        "AI/ML: Foundational experience building and evaluating ML models using scikit-learn, PyTorch, or TensorFlow",
+        "Cloud: Hands-on experience working with cloud platforms (AWS, Azure, or GCP) - e.g., cloud storage, compute, serverless functions, or managed ML services",
+        "SQL: Proficiency in SQL - joins, aggregations, filtering, and basic query optimization",
+        "Software Engineering: Understanding of software engineering fundamentals - version control (Git), code modularity, testing, and CI/CD concepts",
+        "Statistics: Working knowledge of foundational statistical concepts - hypothesis testing, distributions, regression, and sampling methods applied to real-world datasets",
+        "Communication: Ability to translate technical findings into clear, actionable insights for cross-functional audiences",
+        "LLMs / Generative AI: Familiarity with large language model APIs (OpenAI, Anthropic, etc.), prompt engineering, or building LLM-powered data workflows - strongly preferred",
+        "AI Dev Tools: Active use of AI-assisted coding environments such as Windsurf, GitHub Copilot, or Cursor as part of the daily development workflow - strongly preferred",
+        "Cloud Deployment: Hands-on experience containerizing and deploying models using Docker, Kubernetes, or cloud-native ML services (SageMaker, Azure ML, Vertex AI) - strongly preferred",
+        "Agentic AI Stack: Familiarity with tools and frameworks used to develop, orchestrate, and monitor agentic AI systems, including:",
+        "Agent frameworks (e.g., LangGraph, AutoGen)",
+        "Model, retrieval, and memory tooling (e.g., Hugging Face Transformers, Pinecone)",
+        "Evaluation, guardrails, and observability (e.g., LangSmith, Ragas)",
+        "MCP (Model Context Protocol): Awareness of or hands-on experience with MCP to connect AI models to external tools, databases, or APIs",
+        "API Development: Experience building REST APIs or microservices using FastAPI, Flask, or similar frameworks to serve ML models or data products",
+        "Data Warehousing: Exposure to platforms such as Snowflake, Databricks, BigQuery, or Azure Synapse",
+        "Advanced Statistics: Familiarity with multivariate analysis, survival analysis, or statistical process control (SPC)",
+        "BI Tools: Exposure to Power BI, Tableau, or similar dashboard and reporting platforms",
+        "Data Storytelling: A passion for turning complex data into compelling narratives that drive action",
+        "Medtech / Healthcare: Experience or genuine interest in medical technology, clinical studies, or healthcare data"
+      ]
+    }
+  ]
+}
