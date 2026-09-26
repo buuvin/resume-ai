@@ -17,6 +17,12 @@ Where to look
 
 What is implemented (summary)
 
+Current repository status
+
+- The latest commit, `3e2b42c` (`requirement structure change and alignment pipeline guided tests`), is committed and pushed to `origin/main`.
+- The working tree currently has one uncommitted change: `.gitignore` now ignores `input/`.
+- The alignment evidence pipeline has been implemented and covered with guided tests; the next phase is to rebuild the broader optimization flow around it.
+
 - FastAPI backend with POST /analyze and static frontend serving at /.
 - Frontend UI that accepts resume text, job description, and supplemental context; posts JSON to /analyze and renders structured results.
 - Analysis pipeline (app/services/analysis.py):
@@ -34,17 +40,22 @@ What is implemented (summary)
 
 Short-term next tasks (prioritized)
 
-1. Alignment evidence plan
-Use only job-description bullets under the requirements section as requirements.
-Collect resume evidence from NER entities, KeyBERT phrases, and resume bullet points.
-Compare every resume evidence source against every JD requirement bullet.
-For each requirement, retain the strongest evidence pieces, potentially multiple, rather than only one.
-Allow evidence to come from any combination of the three sources; a source does not need to contribute evidence. 
-Store each selected evidence piece as its own AlignmentEvidence object with its source, text, similarity, and exact-match status.
-Rank or group the evidence by requirement so downstream optimization can see the strongest supporting and weakest supporting evidence.
-Return an empty evidence result only when no resume source produces a usable match.
-Update scoring so requirement alignment is based on the selected evidence set without allowing duplicate or redundant evidence to inflate the score.
-Add tests for multiple strong matches, mixed-source evidence, empty sources, and duplicate evidence.
+1. Complete the alignment machine rebuild
+Rename and consolidate the normalization/alignment entry point as the alignment machine.
+Embed NER entities, KeyBERT phrases, and resume/job-description bullet points while retaining their original strings.
+Build source-specific cosine-similarity matrices between resume evidence and job-description requirements.
+For each requirement, select the strongest resume match and return an `AlignmentEvidence` object containing `source`, `requirement`, `evidence`, `alignment`, and `exact_match`.
+Keep NER, KeyBERT, and bullet-point evidence distinguishable, and ensure empty sources and duplicate evidence are handled without inflating scores.
+
+2. Rebuild the optimization process
+Use the alignment evidence output as the deterministic input to optimization.
+Define how requirements are grouped, ranked, and converted into actionable resume changes before any LLM refinement.
+Add focused tests for mixed evidence sources, multiple strong matches, no-match cases, exact matches, and score deduplication.
+
+3. Validate and document the new flow
+Run the full test suite after the alignment and optimization changes.
+Update schemas, API output examples, and frontend handling to match the new evidence contract.
+Keep the analysis-first and no-hallucination constraints explicit throughout the pipeline.
 
 Long-term goals:
 
