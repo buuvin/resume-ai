@@ -36,7 +36,7 @@ def test_analyze_endpoint():
         "supplemental_text": "Built SQL data pipelines for analytics.",
     }
 
-    response = client.post("/analyze", json=payload)
+    response = client.post("/analyze", json=payload) w  
 
     assert response.status_code == 200
     data = response.json()
@@ -53,7 +53,7 @@ def test_analyze_endpoint():
     assert data["analysis"]["alignment_evidence"]
     assert {
         item["source"] for item in data["analysis"]["alignment_evidence"]
-    } <= {"ner", "keybert", "bulletpoints"}
+    } <= {"keybert", "bulletpoints"}
     assert all(
         item["requirement"] in {
             "Python",

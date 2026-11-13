@@ -10,6 +10,7 @@ from app.services.analysis import (
     _alignment_normalize,
     _flatten_entities,
     alignment_machine,
+    decompose_requirements,
     extract_domain_entities,
     write_alignment_evidence,
     write_resume_evidence,
@@ -48,7 +49,7 @@ def test_alignment_normalize_expands_and_canonicalizes_aliases():
     assert _alignment_normalize("AWS Lambda") == "amazon web services"
 
 
-def test_alignment_machine_returns_strongest_evidence_across_sources(monkeypatch):
+def test_alignment_machine_uses_only_keybert_and_bulletpoint_evidence(monkeypatch):
     class FakeEmbedding:
         def __init__(self, vectors):
             self.embeddings = vectors
@@ -69,20 +70,17 @@ def test_alignment_machine_returns_strongest_evidence_across_sources(monkeypatch
     )
 
     alignments = alignment_machine(
-        {
-            "ner": ["Python"],
-            "keybert": ["PostgreSQL"],
-            "bulletpoints": ["AWS"],
-        },
+        {"keybert": ["PostgreSQL"], "bulletpoints": ["AWS"]},
         ["Python backend development"],
     )
 
     assert [(item.source, item.evidence) for item in alignments] == [
-        ("ner", "Python"),
         ("bulletpoints", "AWS"),
+        ("keybert", "PostgreSQL"),
     ]
-    assert [item.alignment for item in alignments] == [1.0, 1.0]
+    assert [item.alignment for item in alignments] == [1.0, 0.0]
     assert all(item.requirement == "Python backend development" for item in alignments)
+    assert all(item.sub_requirement == "Python backend development" for item in alignments)
 
 
 def test_alignment_machine_rejects_unknown_sources():
@@ -92,6 +90,11 @@ def test_alignment_machine_rejects_unknown_sources():
         assert str(error) == "resume_evidence contains an unknown source"
     else:
         raise AssertionError("alignment_machine accepted an unknown source")
+
+
+def test_alignment_machine_rejects_resume_ner_evidence():
+    with pytest.raises(ValueError, match="resume_evidence contains an unknown source"):
+        alignment_machine({"ner": ["Python"]}, ["Python"])
 
 
 def test_alignment_machine_allows_empty_sources_and_returns_zero_match(monkeypatch):
@@ -104,13 +107,58 @@ def test_alignment_machine_allows_empty_sources_and_returns_zero_match(monkeypat
     )
 
     alignments = alignment_machine(
-        {"ner": [], "keybert": [], "bulletpoints": []},
+        {"keybert": [], "bulletpoints": []},
         ["Python backend development"],
     )
 
     assert len(alignments) == 1
     assert alignments[0].evidence == ""
     assert alignments[0].alignment == 0.0
+
+
+def test_alignment_machine_keeps_top_ten_even_below_similarity_threshold(monkeypatch):
+    class FakeEmbedding:
+        def __init__(self, vectors):
+            self.embeddings = vectors
+
+    vectors = {
+        "Requirement": [1.0, 0.0],
+        "Evidence one": [0.8, 0.6],
+        "Evidence two": [0.6, 0.8],
+        "Evidence three": [-1.0, 0.0],
+    }
+
+    monkeypatch.setattr(
+        "app.services.embeddings.embed_document",
+        lambda text: FakeEmbedding([vectors[item] for item in text.split("\n")]),
+    )
+
+    alignments = alignment_machine(
+        {"keybert": ["Evidence one", "Evidence two", "Evidence three"]},
+        ["Requirement"],
+    )
+
+    assert [item.evidence for item in alignments] == [
+        "Evidence one",
+        "Evidence two",
+        "Evidence three",
+    ]
+    assert alignments[-1].alignment == -1.0
+
+
+def test_decompose_requirements_combines_keybert_and_ner(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.embeddings.extract_keyphrases",
+        lambda _text: ["machine learning", "Python APIs"],
+    )
+    monkeypatch.setattr(
+        "app.services.analysis.extract_domain_entities",
+        lambda _text: {"concepts": ["machine learning"], "languages": ["python"]},
+    )
+
+    assert decompose_requirements(["Build machine learning APIs"]) == {
+        "Build machine learning APIs": ["machine learning", "Python APIs", "python"]
+    }
 
 
 def test_write_alignment_evidence_groups_all_matches_by_requirement(tmp_path):
@@ -180,11 +228,7 @@ def test_alignment_against_job_description_cases():
         resume_text,
         {"experience", "projects", "skills"},
     )
-    resume_evidence = {
-        "ner": _flatten_entities(resume_entities),
-        "keybert": resume_keyphrases,
-        "bulletpoints": resume_bullets,
-    }
+    resume_evidence = {"keybert": resume_keyphrases, "bulletpoints": resume_bullets}
     write_resume_evidence(
         resume_entities,
         resume_keyphrases,
@@ -197,6 +241,9 @@ def test_alignment_against_job_description_cases():
         evidence = alignment_machine(
             resume_evidence,
             case["expected_requirements"],
+            requirement_subrequirements=decompose_requirements(
+                case["expected_requirements"]
+            ),
         )
 
         write_alignment_evidence(

@@ -18,6 +18,7 @@ class DomainEntities(BaseModel):
 class AlignmentEvidence(BaseModel):
     source: Literal["ner", "keybert", "bulletpoints"]
     requirement: str
+    sub_requirement: str = ""
     evidence: str
     alignment: float
     exact_match: bool
