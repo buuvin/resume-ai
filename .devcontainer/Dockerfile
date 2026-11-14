@@ -16,10 +16,14 @@ WORKDIR /workspace
 COPY requirements.txt .
 
 # Ensure pip is up-to-date
-RUN pip install --upgrade pip  
+RUN pip install --upgrade pip
 
 # Install dependencies globally in the container
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Download the spaCy model required by keyphrase-vectorizers.
+# Not available as a regular PyPI dependency.
+RUN python -m spacy download en_core_web_sm
 
 # Copy rest of code
 COPY . . 

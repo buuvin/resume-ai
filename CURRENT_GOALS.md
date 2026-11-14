@@ -354,13 +354,13 @@ Ordered by dependency. Phases 0–3 make the pipeline *correct*; 4–6 make it *
 [Immediate next steps](#immediate-next-steps--phase-0) at the top of this document.
 Do that work first; this checklist is the summary.**
 
-- [ ] Fix the `tests/test_analyze.py:39` syntax error so pytest can collect.
-- [ ] Add `RUN python -m spacy download en_core_web_sm` to `.devcontainer/Dockerfile`
+- [x] Fix the `tests/test_analyze.py:39` syntax error so pytest can collect.
+- [x] Add `RUN python -m spacy download en_core_web_sm` to `.devcontainer/Dockerfile`
       so the model is baked into the image rather than downloaded lazily at request time.
-- [ ] Add `pyproject.toml` with ruff + pytest configuration and `pythonpath = ["."]`,
+- [x] Add `pyproject.toml` with ruff + pytest configuration and `pythonpath = ["."]`,
       so `pytest` works without depending on `python -m pytest` path behaviour.
-- [ ] Strip the whitespace-only edits so the diff shows only meaningful changes.
-- [ ] Commit a green baseline.
+- [x] Strip the whitespace-only edits so the diff shows only meaningful changes.
+- [x] Commit a green baseline.
 
 ### Phase 1 — Real resume bullets (~1.5 h)
 

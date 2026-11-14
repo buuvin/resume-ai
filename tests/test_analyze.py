@@ -36,7 +36,7 @@ def test_analyze_endpoint():
         "supplemental_text": "Built SQL data pipelines for analytics.",
     }
 
-    response = client.post("/analyze", json=payload) w  
+    response = client.post("/analyze", json=payload)
 
     assert response.status_code == 200
     data = response.json()

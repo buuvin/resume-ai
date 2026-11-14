@@ -301,7 +301,7 @@ def alignment_machine(
                     AlignmentEvidence(
                         source=source,
                         requirement="",
-                        sub_requirement=subrequirement,  
+                        sub_requirement=subrequirement,
                         evidence=evidence_item,
                         alignment=float(
                             similarity_matrix[subrequirement_index, evidence_index]
