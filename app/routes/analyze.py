@@ -65,6 +65,7 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
         analysis.resume_entities.model_dump(),
         analysis.resume_keyphrases,
         getattr(bullet_similarity, "resume_bullets", []),
+        resume_title_lines=analysis.resume_title_lines,
     )
     if analysis.missing_skills:
         top_gap_list = ", ".join(analysis.missing_skills[:3])

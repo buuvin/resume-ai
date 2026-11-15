@@ -1,9 +1,12 @@
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
 
 import numpy as np
 from keyphrase_vectorizers import KeyphraseCountVectorizer
+
+from app.services.analysis import clean_text
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 
@@ -31,10 +34,98 @@ class BulletSimilarityResult:
     top_matches: list[BulletMatch]
     lowest_matches: list[BulletMatch]
     average_similarity: float
+    resume_title_lines: list[str] = field(default_factory=list)
+
+
+BULLET_MARKER_PATTERN = re.compile(r"^(?:[●•◦*‣⁃]\s*|[-–—]\s+)")
+MONTH_DATE_PATTERN = re.compile(
+    r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]* \d{4}\b"
+)
+SEASON_DATE_PATTERN = re.compile(r"\b(?:spring|summer|fall|winter) \d{4}\b")
+YEAR_TO_PRESENT_PATTERN = re.compile(r"\b\d{4}\b.*\bpresent\b|\bpresent\b.*\b\d{4}\b")
 
 
 def split_document_lines(text: str) -> list[str]:
     return [line.strip() for line in (text or "").splitlines() if line.strip()]
+
+
+def _strip_bullet_marker(line: str) -> str:
+    """Remove a leading bullet marker; return the line unchanged otherwise."""
+    return BULLET_MARKER_PATTERN.sub("", line, count=1)
+
+
+def _is_title_line(line: str) -> bool:
+    """Detect job-title / company / date-range metadata lines.
+
+    A title line has no bullet marker, contains a pipe separator, and carries a
+    date-range token (month year, season year, a year range, or an explicit
+    'in progress' marker for ongoing work).
+    """
+    if _strip_bullet_marker(line) != line:
+        return False
+    if "|" not in line:
+        return False
+    normalized = clean_text(line)
+    return bool(
+        MONTH_DATE_PATTERN.search(normalized)
+        or SEASON_DATE_PATTERN.search(normalized)
+        or YEAR_TO_PRESENT_PATTERN.search(normalized)
+        or re.search(r"\bin progress\b", normalized)
+    )
+
+
+def extract_evidence_lines(
+    text: str,
+    section_names: set[str],
+    minimum_words: int = 3,
+) -> dict[str, list[str]]:
+    """Join wrapped bullet lines and classify them into tagged evidence sources.
+
+    Lines starting with a bullet marker begin a bullet; following lines without
+    a marker are continuations of the open bullet (PDF line-wrapping repair).
+    Orphan lines are classified: title/metadata lines are tagged separately,
+    other content lines stand alone. The minimum-word filter applies to the
+    joined result, never to individual wrapped fragments.
+    """
+    from app.services.analysis import parse_sections
+
+    bullets: list[str] = []
+    titles: list[str] = []
+    for section_name, section_text in parse_sections(text).items():
+        if section_name not in section_names:
+            continue
+
+        open_bullet: list[str] = []
+
+        def flush_open_bullet() -> None:
+            nonlocal open_bullet
+            if open_bullet:
+                joined = " ".join(open_bullet)
+                if len(joined.split()) >= minimum_words:
+                    bullets.append(joined)
+                open_bullet = []
+
+        for line in section_text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            markerless = _strip_bullet_marker(stripped)
+            if markerless != stripped:
+                flush_open_bullet()
+                open_bullet = [markerless]
+            elif open_bullet:
+                if _is_title_line(stripped):
+                    flush_open_bullet()
+                    titles.append(stripped)
+                else:
+                    open_bullet.append(stripped)
+            elif _is_title_line(stripped):
+                titles.append(stripped)
+            elif len(stripped.split()) >= minimum_words:
+                bullets.append(stripped)
+        flush_open_bullet()
+
+    return {"bulletpoints": bullets, "titles": titles}
 
 
 def extract_bullet_points(
@@ -42,22 +133,13 @@ def extract_bullet_points(
     section_names: set[str],
     minimum_words: int = 3,
 ) -> list[str]:
-    """Return parsed section lines containing more than two words.
+    """Return joined bullet lines for the requested sections.
 
-    The historical name is retained for compatibility. Section membership and line
-    length determine which lines are embedded; bullet punctuation is ignored.
+    The historical name is retained for compatibility. Wrapped lines are joined
+    into their parent bullet and title/metadata lines are excluded; see
+    extract_evidence_lines for the tagged variant.
     """
-    from app.services.analysis import parse_sections
-
-    bullets = []
-    for section_name, section_text in parse_sections(text).items():
-        if section_name not in section_names:
-            continue
-        for line in section_text.splitlines():
-            cleaned_line = line.strip()
-            if len(cleaned_line.split()) >= minimum_words:
-                bullets.append(cleaned_line)
-    return bullets
+    return extract_evidence_lines(text, section_names, minimum_words)["bulletpoints"]
 
 
 @lru_cache(maxsize=1)
@@ -94,9 +176,11 @@ def compare_bullet_embeddings(
     job_minimum_words: int = 3,
 ) -> BulletSimilarityResult:
     """Compare resume experience/project bullets with job requirement bullets."""
-    resume_bullets = extract_bullet_points(
-        resume_text, {"experience", "projects", "skills"}
+    resume_evidence = extract_evidence_lines(
+        resume_text, {"experience", "projects"}
     )
+    resume_bullets = resume_evidence["bulletpoints"]
+    resume_title_lines = resume_evidence["titles"]
     job_bullets = extract_bullet_points(
         job_description_text,
         job_section_names or {"requirements", "preferred", "skills"},
@@ -110,6 +194,7 @@ def compare_bullet_embeddings(
             top_matches=[],
             lowest_matches=[],
             average_similarity=0.0,
+            resume_title_lines=resume_title_lines,
         )
 
     embedding_model = model or get_embedding_model()
@@ -163,6 +248,7 @@ def compare_bullet_embeddings(
         )[:top_n],
         lowest_matches=sorted(pairs, key=lambda pair: pair.similarity_score)[:top_n],
         average_similarity=float(matrix.mean()),
+        resume_title_lines=resume_title_lines,
     )
 
 

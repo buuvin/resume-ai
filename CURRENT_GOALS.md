@@ -364,11 +364,21 @@ Do that work first; this checklist is the summary.**
 
 ### Phase 1 — Real resume bullets (~1.5 h)
 
-- [ ] Join PDF line-wrap fragments back into their parent bullet (`●`, `-`, `•` markers).
-- [ ] Exclude section headings and sub-labels from the evidence pool.
-- [ ] Decide how job-title / company lines are handled (exclude, or tag as a distinct
-      source) so they cannot win a match.
-- [ ] Target: evidence pool drops from 46 mixed strings to ~21 genuine bullets.
+- [x] Join PDF line-wrap fragments back into their parent bullet (`●`, `-`, `•` markers).
+- [x] Exclude section headings and sub-labels from the evidence pool.
+- [x] Decide how job-title / company lines are handled (exclude, or tag as a distinct
+      source) so they cannot win a match. *Decision: kept as a tagged `titles` source —
+      surfaced in `resume_evidence.json` and `AnalysisResult.resume_title_lines`; not
+      used in requirement comparison.*
+- [x] Target: evidence pool drops from 46 mixed strings to ~21 genuine bullets.
+      *Verified: 21 bullets, 7 titles tagged, 0 wrap fragments, 0 headings in the pool.*
+
+> Verified follow-on for Phase 2: the cited-evidence pollution that remains comes
+> entirely from the **KeyBERT channel** — `skills`, `project experience`, `keywords`
+> are extracted as keyphrases over the raw document (heading tokens are salient). The
+> Phase 2 item *exclude heading-like evidence strings from matching* must apply to the
+> keybert source, not just bullets. Evidence-row volume (500) is unchanged here because
+> the evidence floor is Phase 2 work.
 
 ### Phase 2 — Rebuild the alignment machine (~3 h)
 

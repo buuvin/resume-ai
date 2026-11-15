@@ -35,6 +35,7 @@ class AnalysisResult(BaseModel):
     job_description_entities: DomainEntities
     supplemental_entities: DomainEntities
     alignment_evidence: List[AlignmentEvidence] = Field(default_factory=list)
+    resume_title_lines: List[str] = Field(default_factory=list)
 
 class ImprovementResult(BaseModel):
     rewritten_summary: str = ""

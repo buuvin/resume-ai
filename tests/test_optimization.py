@@ -15,7 +15,11 @@ from app.services.analysis import (
     write_alignment_evidence,
     write_resume_evidence,
 )
-from app.services.embeddings import embed_document, extract_bullet_points, extract_keyphrases
+from app.services.embeddings import (
+    embed_document,
+    extract_evidence_lines,
+    extract_keyphrases,
+)
 from app.services.ingestion import extract_upload_text
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -196,6 +200,7 @@ def test_write_resume_evidence_keeps_sources_separate(tmp_path):
         {"python developer"},
         ["Built Python APIs"],
         output_path,
+        resume_title_lines=["Tutor | Chapman University Sept 2022 - May 2023"],
     )
 
     output = json.loads(output_path.read_text(encoding="utf-8"))
@@ -205,6 +210,7 @@ def test_write_resume_evidence_keeps_sources_separate(tmp_path):
             "ner": {"languages": ["python"], "concepts": ["machine learning"]},
             "keybert": ["python developer"],
             "bulletpoints": ["Built Python APIs"],
+            "titles": ["Tutor | Chapman University Sept 2022 - May 2023"],
         }
     }
 
@@ -224,15 +230,18 @@ def test_alignment_against_job_description_cases():
         embedded_document=embedded_resume,
     )
     resume_entities = extract_domain_entities(resume_text)
-    resume_bullets = extract_bullet_points(
+    resume_evidence_lines = extract_evidence_lines(
         resume_text,
-        {"experience", "projects", "skills"},
+        {"experience", "projects"},
     )
+    resume_bullets = resume_evidence_lines["bulletpoints"]
+    resume_title_lines = resume_evidence_lines["titles"]
     resume_evidence = {"keybert": resume_keyphrases, "bulletpoints": resume_bullets}
     write_resume_evidence(
         resume_entities,
         resume_keyphrases,
         resume_bullets,
+        resume_title_lines=resume_title_lines,
     )
 
     output_dir = PROJECT_ROOT / "output"

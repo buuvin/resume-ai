@@ -170,8 +170,13 @@ def parse_sections(text: str):
     headings = {
         "summary": ["summary", "professional summary", "profile"],
         "skills": ["skills", "technical skills", "skillset"],
-        "experience": ["experience", "work experience", "professional experience"],
-        "projects": ["projects", "personal projects"],
+        "experience": [
+            "experience",
+            "work experience",
+            "professional experience",
+            "leadership experience",
+        ],
+        "projects": ["projects", "personal projects", "project experience"],
         "education": ["education", "academic"],
         "certifications": ["certifications", "licenses"],
         "requirements": ["requirements", "requirement", "qualifications", "qualification"],
@@ -397,6 +402,8 @@ def write_resume_evidence(
     resume_keyphrases: list[str] | set[str],
     resume_bullets: list[str],
     output_path: Path = RESUME_EVIDENCE_OUTPUT,
+    *,
+    resume_title_lines: list[str] | set[str] | None = None,
 ) -> None:
     """Write all collected resume evidence without requirement alignment data."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -407,6 +414,7 @@ def write_resume_evidence(
                     "ner": resume_entities,
                     "keybert": _unique_strings(resume_keyphrases),
                     "bulletpoints": _unique_strings(resume_bullets),
+                    "titles": _unique_strings(resume_title_lines),
                 }
             },
             indent=2,
@@ -482,4 +490,5 @@ def analyze_resume(
         job_description_entities=jd_entities,
         supplemental_entities=extract_domain_entities(supplemental),
         alignment_evidence=alignment_evidence,
+        resume_title_lines=getattr(bullet_similarity, "resume_title_lines", []),
     )
