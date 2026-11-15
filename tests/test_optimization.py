@@ -12,6 +12,7 @@ from app.services.analysis import (
     alignment_machine,
     decompose_requirements,
     extract_domain_entities,
+    preprocess_for_semantic_extraction,
     write_alignment_evidence,
     write_resume_evidence,
 )
@@ -224,12 +225,13 @@ def test_alignment_against_job_description_cases():
     resume_text = _extract_resume_pdf(resume_path)
     assert resume_text, f"No text could be extracted from {resume_path}"
 
-    embedded_resume = embed_document(resume_text)
+    extraction_text = preprocess_for_semantic_extraction(resume_text)
+    embedded_resume = embed_document(extraction_text)
     resume_keyphrases = extract_keyphrases(
-        resume_text,
+        extraction_text,
         embedded_document=embedded_resume,
     )
-    resume_entities = extract_domain_entities(resume_text)
+    resume_entities = extract_domain_entities(extraction_text)
     resume_evidence_lines = extract_evidence_lines(
         resume_text,
         {"experience", "projects"},
@@ -263,5 +265,17 @@ def test_alignment_against_job_description_cases():
             failures.append(f"{case['case_id']}: no alignment evidence produced")
         elif not all(item.requirement and item.source for item in evidence):
             failures.append(f"{case['case_id']}: malformed alignment evidence")
+
+        # 'skills' and 'project experience' can only enter the keybert channel
+        # from heading lines, which preprocess_for_semantic_extraction removes.
+        # 'keywords' is excluded from this set deliberately: the word appears
+        # in genuine resume content ("identify critical skills, keywords, ...").
+        heading_like_phrases = {"skills", "project experience"}
+        cited_evidence = {item.evidence.strip().lower() for item in evidence}
+        if cited_evidence & heading_like_phrases:
+            failures.append(
+                f"{case['case_id']}: heading-like strings cited as evidence: "
+                f"{sorted(cited_evidence & heading_like_phrases)}"
+            )
 
     assert not failures, "Fixture alignment failures:\n" + "\n".join(failures)

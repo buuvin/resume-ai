@@ -9,6 +9,7 @@ from app.services.ingestion import extract_upload_text
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from app.services.analysis import (
     analyze_resume,
+    preprocess_for_semantic_extraction,
     write_alignment_evidence,
     write_resume_evidence,
 )
@@ -24,7 +25,13 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
             "job description": job_description_text,
             "supplemental": supplemental_text,
         }
-        for document_name, document_text in documents.items():
+        # NER and KeyBERT must never see heading lines or subheader labels:
+        # they are document furniture and would rank as salient phrases.
+        extraction_documents = {
+            document_name: preprocess_for_semantic_extraction(document_text)
+            for document_name, document_text in documents.items()
+        }
+        for document_name, document_text in extraction_documents.items():
             embedded_document = embed_document(document_text)
             keyphrases[document_name] = extract_keyphrases(
                 document_text, embedded_document=embedded_document
@@ -52,9 +59,9 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
         )
 
     analysis = analyze_resume(
-        resume_text,
-        job_description_text,
-        supplemental_text,
+        extraction_documents.get("resume", resume_text),
+        extraction_documents.get("job description", job_description_text),
+        extraction_documents.get("supplemental", supplemental_text),
         resume_keyphrases=set(keyphrases.get("resume", [])),
         jd_keyphrases=set(keyphrases.get("job description", [])),
         supplemental_keyphrases=set(keyphrases.get("supplemental", [])),

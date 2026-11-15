@@ -158,6 +158,87 @@ def extract_domain_entities(text: str) -> dict[str, list[str]]:
     }
 
 
+MAX_SUBHEADER_LABEL_WORDS = 4
+
+
+def strip_subheader_labels(text: str) -> str:
+    """Separate 'Label: value' lines and keep only the value side.
+
+    Category subheaders such as 'Programming & Tools' or 'Degree' are document
+    furniture, not evidence, so they must not surface as keyphrases or
+    entities. A line is treated as label:value only when the label is short
+    (<= MAX_SUBHEADER_LABEL_WORDS words); longer labels indicate a sentence
+    with a mid-line colon and are left untouched.
+    """
+    kept_lines = []
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        colon_index = stripped.find(":")
+        if colon_index == -1:
+            kept_lines.append(stripped)
+            continue
+        label = stripped[:colon_index]
+        value = stripped[colon_index + 1 :].strip()
+        if not value:
+            # A bare 'Label:' line is a heading; drop it entirely.
+            continue
+        if len(label.split()) <= MAX_SUBHEADER_LABEL_WORDS:
+            kept_lines.append(value)
+        else:
+            kept_lines.append(stripped)
+    return "\n".join(kept_lines)
+
+
+def strip_heading_lines(text: str) -> str:
+    """Remove standalone heading lines from text before semantic extraction.
+
+    Only exact heading matches are removed (never prefix matches) so that
+    requirement bullets beginning with words like 'experience' survive.
+    """
+    heading_lookup = {
+        variant
+        for variants in HEADING_VARIANTS.values()
+        for variant in variants
+    }
+    kept_lines = []
+    for line in (text or "").splitlines():
+        normalized = re.sub(r"[^\w\s]", " ", line).strip().lower()
+        if normalized in heading_lookup:
+            continue
+        if line.strip():
+            kept_lines.append(line.strip())
+    return "\n".join(kept_lines)
+
+
+def preprocess_for_semantic_extraction(text: str) -> str:
+    """Clean text before NER and KeyBERT run on it.
+
+    Heading lines and subheader labels are document furniture; feeding them to
+    KeyBERT lets salient tokens like 'skills' rank as keyphrases and pollute
+    the evidence pool.
+    """
+    return strip_subheader_labels(strip_heading_lines(text))
+
+
+HEADING_VARIANTS = {
+    "summary": ["summary", "professional summary", "profile"],
+    "skills": ["skills", "technical skills", "skillset"],
+    "experience": [
+        "experience",
+        "work experience",
+        "professional experience",
+        "leadership experience",
+    ],
+    "projects": ["projects", "personal projects", "project experience"],
+    "education": ["education", "academic"],
+    "certifications": ["certifications", "licenses"],
+    "requirements": ["requirements", "requirement", "qualifications", "qualification"],
+    "preferred": ["nice to have", "nice-to-have", "preferred", "nice to haves"],
+}
+
+
 def parse_sections(text: str):
     """Split a resume-like text into high-level sections using common headings.
 
@@ -167,24 +248,8 @@ def parse_sections(text: str):
     if not text or not text.strip():
         return {"body": ""}
 
-    headings = {
-        "summary": ["summary", "professional summary", "profile"],
-        "skills": ["skills", "technical skills", "skillset"],
-        "experience": [
-            "experience",
-            "work experience",
-            "professional experience",
-            "leadership experience",
-        ],
-        "projects": ["projects", "personal projects", "project experience"],
-        "education": ["education", "academic"],
-        "certifications": ["certifications", "licenses"],
-        "requirements": ["requirements", "requirement", "qualifications", "qualification"],
-        "preferred": ["nice to have", "nice-to-have", "preferred", "nice to haves"],
-    }
-
     heading_lookup = {}
-    for key, variants in headings.items():
+    for key, variants in HEADING_VARIANTS.items():
         for v in variants:
             heading_lookup[v] = key
 

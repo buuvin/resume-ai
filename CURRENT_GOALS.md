@@ -373,12 +373,14 @@ Do that work first; this checklist is the summary.**
 - [x] Target: evidence pool drops from 46 mixed strings to ~21 genuine bullets.
       *Verified: 21 bullets, 7 titles tagged, 0 wrap fragments, 0 headings in the pool.*
 
-> Verified follow-on for Phase 2: the cited-evidence pollution that remains comes
-> entirely from the **KeyBERT channel** — `skills`, `project experience`, `keywords`
-> are extracted as keyphrases over the raw document (heading tokens are salient). The
-> Phase 2 item *exclude heading-like evidence strings from matching* must apply to the
-> keybert source, not just bullets. Evidence-row volume (500) is unchanged here because
-> the evidence floor is Phase 2 work.
+> Verified follow-on for Phase 2: after the subheader-noise fix (heading-line
+> removal + `Label: value` separation via `preprocess_for_semantic_extraction`),
+> zero alignment rows cite heading strings. Remaining Phase 2 concerns: the
+> keybert channel can still surface single body-content words (e.g. `keywords`
+> from "identify critical skills, keywords, ...") — legitimate but thin
+> evidence, so the evidence floor and cross-source deduplication matter more
+> than further source filtering. Row volume (500) is unchanged because the
+> floor is Phase 2 work.
 
 ### Phase 2 — Rebuild the alignment machine (~3 h)
 
