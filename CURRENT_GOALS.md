@@ -9,9 +9,11 @@ Read this file for what is true *today*.
 
 ---
 
-## Immediate next steps — Phase 0
+## Immediate next steps — Phase 0 ✅ COMPLETE
 
-**Do this first. Nothing else can be validated until it is done.**
+**Done and committed (`b014ec8`). All 39 tests pass; the container serves requests
+end to end without a network call for the spaCy model. The historical instructions
+below are kept for reference.**
 
 Right now `python -m pytest` aborts during collection, so **no test in the project runs**.
 Fixing that is a two-character edit plus one missing image step.
@@ -158,6 +160,13 @@ baseline to build the remaining phases on top of.
 - **Scoring** (`_summarize_alignment`): best alignment per requirement →
   `matched` (≥ 0.70), `underrepresented` (0.45–0.70), `missing` (< 0.45);
   `alignment_score` = mean of the per-requirement best alignments.
+- **Extraction preprocessing** (`preprocess_for_semantic_extraction`): heading lines and
+  `Label: value` subheader labels are removed before NER and KeyBERT run, so document
+  furniture cannot rank as salient keyphrases.
+- **Bullet extraction** (`extract_evidence_lines`): joins PDF line-wrap fragments into
+  parent bullets, strips bullet markers, and tags title/company/date lines as a separate
+  `titles` evidence source (surfaced in `AnalysisResult.resume_title_lines` and
+  `output/resume_evidence.json`, excluded from requirement comparison).
 - **Artefact writing**: `write_alignment_evidence()` groups evidence by requirement into
   `output/alignment_evidence.json`; `write_resume_evidence()` dumps the raw resume
   evidence into `output/resume_evidence.json`.
@@ -184,12 +193,11 @@ chips, KeyBERT phrases, domain entities, and a stub improvement summary.
 
 ### Tests
 
-Four modules, 24 tests, covering the endpoint, upload ingestion, section parsing,
-embeddings, KeyBERT wiring, normalisation, alignment-machine behaviour and a
-fixture-driven run over all five job descriptions.
+Four modules, 39 tests, covering the endpoint, upload ingestion, section parsing,
+heading/subheader preprocessing, embeddings, KeyBERT wiring, bullet joining, normalisation,
+alignment-machine behaviour and a fixture-driven run over all five job descriptions.
 
-> These tests **pass** once (a) the `tests/test_analyze.py` syntax error is fixed and
-> (b) `en_core_web_sm` is installed. Both are outstanding Phase 0 items.
+> All tests pass as of the Phase 0/1 work (verified in the container: 39 passed).
 
 ---
 
@@ -388,10 +396,16 @@ Do that work first; this checklist is the summary.**
 - [ ] Restore NER as a valid evidence source; remove the test asserting it raises.
 - [ ] Restore the minimum alignment floor so irrelevant rows are never emitted.
 - [ ] De-duplicate evidence within a requirement across sources.
-- [ ] Exclude heading-like evidence strings from matching.
+- [x] Exclude heading-like evidence strings from matching. *Done ahead of Phase 2 via
+      `preprocess_for_semantic_extraction` (heading-line removal + `Label: value`
+      separation); heading-cited rows dropped 131 → 0. Residual single-word keybert
+      phrases from genuine body content (e.g. `keywords`) are left to the evidence
+      floor, not source filtering.*
 - [ ] Apply the scoring rule above (mean over sub-requirements, floor applied).
 - [ ] Strengthen the fixture test: assert requirement coverage, row volume, and that
-      no cited evidence is a heading or a wrap fragment.
+      no cited evidence is a heading or a wrap fragment. *Partially done: the
+      heading-citation assertion is in place; row-volume and coverage assertions
+      remain.*
 
 ### Phase 3 — Finish the paused JD extraction (~2.5 h)
 
