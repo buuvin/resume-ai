@@ -30,5 +30,3 @@ COPY . .
 
 # Expose FastAPI port
 EXPOSE 8000
-
-CMD ["bash"]

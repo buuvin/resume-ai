@@ -1,0 +1,23 @@
+# Keep the Docker build context small and reproducible.
+# The dev environment is a conda env outside the repo, but stale local
+# environments and caches must never end up inside the image.
+
+.git/
+.venv/
+venv/
+envs/
+env/
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Generated analysis artefacts are recreated at runtime.
+output/
+
+# Leftover local backups.
+*.rootbak/
+
+# The image recipe itself is not needed inside the image.
+.devcontainer/

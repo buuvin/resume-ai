@@ -1,11 +1,28 @@
 # Python
-venv/
-.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
-input/
+.ruff_cache/
+
+# Environments
+# The dev environment is a conda env outside the repo:
+#   conda create -n resume-ai python=3.10
+venv/
+.venv/
+envs/
+env/
+
+# Input fixtures are tracked explicitly. The blanket "input/" rule used to hide
+# new fixtures from git, because the two existing files stayed tracked by accident.
+input/*
+!input/Bhuvan_Balagar_Resume-1.pdf
+!input/job_description_cases.json
+
+# Generated analysis artefacts. Regenerate with: python scripts/demo.py
 output/
+
+# Leftover local backups
+*.rootbak/
 
 # VS Code
 .vscode/

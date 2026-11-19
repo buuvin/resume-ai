@@ -1,0 +1,22 @@
+# Development environment for Resume AI.
+#
+#   conda env create -f environment.yml
+#   conda activate resume-ai
+#
+# requirements.txt stays the single source of truth for Python dependencies, so
+# this file and the Docker image can never drift apart.
+#
+# IMPORTANT: the spaCy model that keyphrase-vectorizers needs is NOT a conda
+# package and is therefore not listed here. It must be installed separately:
+#
+#   python -m spacy download en_core_web_sm
+#
+# scripts/setup_env.sh does both steps for you.
+name: resume-ai
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - -r requirements.txt
