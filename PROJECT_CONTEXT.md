@@ -97,9 +97,12 @@ Extract clean text from:
 > `.rtf`, `.pdf` and `.docx`; unsupported extensions return HTTP 400. Plain-text
 > pastes are the primary path — file upload is an alternative, not a requirement.
 >
-> **Known limitation:** text extracted from PDFs preserves the source line breaks, so a
-> bullet that wraps across three printed lines arrives as three separate lines. The
-> bullet-joining step that repairs this is Phase 1 of the MVP plan.
+> **PDF line breaks are now repaired.** Text extracted from PDFs preserves the source
+> line breaks, so a bullet that wraps across three printed lines used to arrive as
+> three separate lines and be treated as three separate pieces of evidence.
+> `extract_evidence_lines()` now joins wrapped fragments back into their parent bullet
+> and strips the bullet marker. Title, company and date lines are recognised and
+> tagged as a distinct `titles` source rather than competing as evidence.
 
 ---
 
@@ -148,10 +151,18 @@ Compare the resume against the job description and identify:
 ```
 
 > **Current status: implemented, with known defects.** See `CURRENT_GOALS.md` →
-> *Known gaps and defects* for the verified list. In summary: the analysis engine works
-> when it is given good requirements, but the resume evidence pool is polluted with
-> PDF line-wrap fragments and section headings, and the job-description requirement
-> extractor only recognises one section heading.
+> *Known gaps and defects* for the verified list. In summary:
+>
+> - **Closed.** The resume evidence pool is clean. PDF line-wrap fragments are joined
+>   into their parent bullets, headings and `Label: value` subheaders are stripped
+>   before NER and KeyBERT run, and title lines are tagged as their own source.
+>   Verified: 21 bullets, 7 titles, 0 wrap fragments, 0 headings; heading-cited
+>   evidence rows dropped 131 → 0.
+> - **Open.** The job-description requirement extractor only recognises one section
+>   heading, so four of the five fixture postings yield no requirements at all.
+> - **Open.** The alignment machine has no evidence floor and scores by
+>   max-over-many candidates, which makes the matched / underrepresented / missing
+>   split close to degenerate.
 >
 > **Entity extraction is regex-based**, matching against a hand-maintained taxonomy of
 > languages, frameworks, platforms, tools, databases and concepts. It is not spaCy NER,
@@ -338,25 +349,49 @@ The layer is defined behind a `RefinementProvider` interface with two implementa
 
 ## 7. Development Environment
 
+**Development runs in a conda environment. Docker is reserved for the final MVP build.**
+
 **Tools**
 
-- Docker Dev Containers
+- Conda environment `resume-ai` (Python 3.10), located **outside** the repository
 - FastAPI backend
-- `requirements.txt` for dependencies
+- `requirements.txt` for Python dependencies — the single source of truth, shared by
+  the conda environment and the Docker image so the two cannot drift apart
+- `environment.yml` describing the conda environment declaratively
+- `scripts/setup_env.sh` for one-command bootstrapping
 - spaCy model `en_core_web_sm` (required by `keyphrase-vectorizers`)
 
 **Rules**
 
-- Environment must be reproducible
-- Code resides on the host machine; the container mounts it at `/workspace`
-- Dependencies are installed **globally** into the container image — there is no
-  virtual environment, in the container or on the host
-- Dependency changes require an image rebuild
+- The environment must be reproducible: `environment.yml` plus `requirements.txt`
+- No manual dependency installs outside the conda environment
+- The conda environment is disposable — it can be deleted and rebuilt from
+  `environment.yml` at any time
+- The Docker image is **not** part of the development loop. It is built once the MVP is
+  finished, so the project can be reproduced and shipped by someone else
 
-> **Note:** `en_core_web_sm` is not a normal PyPI dependency and must be fetched with
-> `python -m spacy download en_core_web_sm`. Until the Dockerfile does this at build
-> time, a freshly built container fails on every KeyBERT call. Fixing this is Phase 0
-> of the MVP plan.
+**Setup**
+
+```bash
+./scripts/setup_env.sh
+
+conda activate resume-ai
+python -m pytest
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+> **`en_core_web_sm` is required and easy to forget.** It is not a PyPI dependency and
+> not a conda package; it must be fetched with `python -m spacy download
+> en_core_web_sm`. Without it `spacy.load("en_core_web_sm")` raises `OSError [E050]`
+> and every KeyBERT call fails — the API still responds, but with no keyphrases and
+> degraded evidence. `environment.yml` cannot carry this step, so
+> `scripts/setup_env.sh` performs it, and the Dockerfile performs the same download.
+
+> **Why not Docker for development?** The Docker configuration caused repeated friction
+> during development (rebuild latency, cache invalidation, environment drift between
+> the image and the host). The image is now treated as a final artefact rather than a
+> development dependency. The remaining Docker decisions — root `Dockerfile` vs
+> `.devcontainer/`, non-root user, verification — are Phase 9 of the MVP plan.
 
 ---
 
@@ -388,16 +423,20 @@ The layer is defined behind a `RefinementProvider` interface with two implementa
 3. API endpoint (`/analyze`)
 4. Embeddings, KeyBERT and NER extraction
 5. Alignment machine with cited evidence
-6. — *currently here* —
+6. Clean resume evidence: bullet joining, heading/subheader stripping, tagged titles
+7. — *currently here* —
 
 **Remaining for the MVP**
 
-7. Correct the resume bullet extraction and the job-description requirement extraction
-8. Finish the alignment machine: per-source matrices, evidence floor, de-duplication
-9. Rebuild the optimization layer
-10. Add the LLM refinement layer with a working no-API-key default
-11. Surface evidence and recommendations in the frontend
-12. Align the documentation with the code
+8. Finish the alignment machine: per-source matrices, NER restored as an evidence
+   source, evidence floor, cross-source de-duplication, mean-over-sub-requirements
+   scoring
+9. Correct the job-description requirement extraction
+10. Rebuild the optimization layer
+11. Add the LLM refinement layer with a working no-API-key default
+12. Surface evidence and recommendations in the frontend
+13. Align the documentation with the code
+14. Produce the final Docker image for reproducibility
 
 ---
 
@@ -413,3 +452,8 @@ When working in this repository:
 - Update `CURRENT_GOALS.md` and this document in the same commit as the code they
   describe; the docs are part of the deliverable, not an afterthought
 - Add a focused test for any change to analysis logic
+- Run the suite with `python -m pytest` inside the conda env `resume-ai`; do not
+  reinstall dependencies into the system Python
+- `en_core_web_sm` must be present in the environment
+  (`python -m spacy download en_core_web_sm`). If KeyBERT starts raising
+  `OSError [E050]`, this is why

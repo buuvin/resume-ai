@@ -9,94 +9,78 @@ Read this file for what is true *today*.
 
 ---
 
-## Immediate next steps — Phase 0 ✅ COMPLETE
+## Immediate next steps — Phase 2
 
-**Done and committed (`b014ec8`). All 39 tests pass; the container serves requests
-end to end without a network call for the spaCy model. The historical instructions
-below are kept for reference.**
+**Do this next. Phases 0 and 1 are complete and committed.**
 
-Right now `python -m pytest` aborts during collection, so **no test in the project runs**.
-Fixing that is a two-character edit plus one missing image step.
+Phase 0 (`b014ec8`) unblocked the build. Phase 1 (`1ba0f94`, `68d999e`) fixed the
+resume evidence pool. What is left is the alignment machine itself: it still embeds
+every source against one mixed requirement pool, it has no evidence floor, and it
+scores by max-over-many.
 
-### 1. Fix the test collection blocker
+Read the **Design spec: the alignment machine** section below before you start — it
+states the intended inputs, method, output contract, invariants and scoring rule.
 
-`tests/test_analyze.py:39` has a stray `w` typed after the call, which is a `SyntaxError`
-and aborts pytest collection for the whole session:
+### 1. Per-source similarity matrices, compared within themselves
 
-```python
-# current — broken
-response = client.post("/analyze", json=payload) w
+`app/services/analysis.py` → `alignment_machine()`
 
-# fixed
-response = client.post("/analyze", json=payload)
-```
+Today one vector set is built from all decomposed sub-requirements and compared against
+each source in turn, so a NER entity ends up scored against KeyBERT phrases and against
+bullet evidence. Build one matrix per source, and compare the JD side of a source only
+against the resume side of that same source:
 
-*Verification:* `python -m pytest` should collect 4 modules instead of erroring out.
+| Matrix | JD side | Resume side |
+| --- | --- | --- |
+| bulletpoints | JD requirement bullets | resume bullets |
+| keybert | JD KeyBERT phrases | resume KeyBERT phrases |
+| ner | JD NER entities | resume NER entities |
 
-### 2. Bake the spaCy model into the container image
+### 2. Restore NER as an evidence source
 
-`keyphrase-vectorizers` loads `en_core_web_sm`, which is **not** a normal PyPI
-dependency. The Dockerfile installs only `requirements.txt`, so a freshly built image
-raises on every KeyBERT call (spaCy tries to download the model lazily at request time
-and needs network access to do it).
+`valid_sources` is currently `{"keybert", "bulletpoints"}`, and a test asserts that
+passing `ner` raises `ValueError`. NER was removed because it was displacing JD bullet
+points as the *requirements*. The fix is to keep JD bullets as the requirements and
+restore NER as its own evidence channel. Update that test to assert NER is accepted.
 
-Add to `.devcontainer/Dockerfile`, after the `pip install -r requirements.txt` line:
+### 3. Restore the minimum alignment floor
 
-```dockerfile
-# Download the spaCy model required by keyphrase-vectorizers.
-# Not available as a regular PyPI dependency.
-RUN python -m spacy download en_core_web_sm
-```
+`alignment_machine()` emits a row for every (sub-requirement × evidence) pair,
+regardless of similarity. Add a floor constant and drop rows below it — this is what
+removes the 96 %-junk rows. `UNDERREPRESENTED_ALIGNMENT_THRESHOLD` (0.45) is a
+*classification* threshold; consider a separate, higher constant for *emission*.
 
-*Verification:* rebuild the image, then confirm `python -c "import spacy; spacy.load('en_core_web_sm')"`
-succeeds inside the container.
+### 4. De-duplicate evidence within a requirement, across sources
 
-### 3. Add a project configuration file
+The same resume sentence can currently be cited once per source. De-duplicate on the
+normalised evidence string within a requirement so one sentence cannot inflate a score.
 
-There is no `pyproject.toml` or `pytest.ini`, so `pytest` currently only resolves the
-`app` package by accident of how `sys.path` is set up when it is invoked as
-`python -m pytest`. Add one so the suite runs the same way regardless of invocation:
+### 5. Apply the scoring rule
 
-```toml
-[tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["tests"]
+A requirement's score is the **mean of the best alignment across its sub-requirements**,
+computed over evidence that passes the floor, with de-duplication applied first. A
+requirement with no qualifying evidence scores `0.0`. This replaces the current
+max-over-all-sub-requirements rule in `_summarize_alignment()`.
 
-[tool.ruff]
-line-length = 88
-target-version = "py310"
+### 6. Strengthen the fixture test
 
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
-```
+`tests/test_optimization.py::test_alignment_against_job_description_cases` currently
+only asserts that evidence is non-empty and well-formed. Add assertions for:
 
-*Verification:* `pytest` (not `python -m pytest`) works from the repository root.
+- row volume (the 500-row explosion must not come back)
+- requirement coverage against `expected_requirements`
+- no cited evidence is a heading or a line-wrap fragment
 
-### 4. Strip the whitespace-only edits
-
-Three files carry trailing-whitespace changes that dilute the diff and make the real
-work harder to review:
-
-- `.devcontainer/Dockerfile` — `RUN pip install --upgrade pip  `
-- `CURRENT_GOALS.md` — the blank line before *Short-term next tasks*
-- `app/services/analysis.py:304` — `sub_requirement=subrequirement,  `
-
-*Verification:* `git diff` shows only meaningful changes.
-
-### 5. Commit a green baseline
+### Verification
 
 ```bash
-python -m pytest          # expect 24 passed
-git add -A && git commit -m "Unblock test collection and pin the spaCy model"
+python -m pytest
+python scripts/demo.py
 ```
 
-**Expected result after this phase:** 24 tests pass, the container can serve a request
-end to end without a network call for the model, and the repository has a clean
-baseline to build the remaining phases on top of.
-
-> Do not start Phase 1 (resume bullet extraction) until this is green. The bullet
-> extraction work changes what every downstream test observes, and it needs a passing
-> suite to be judged against.
+`scripts/demo.py` runs all five fixture job descriptions against the reference resume
+and prints the summary table. Expect the row counts to fall sharply once the floor
+lands.
 
 ---
 
@@ -115,22 +99,29 @@ baseline to build the remaining phases on top of.
 | Job-description fixtures (ground truth) | `input/job_description_cases.json` |
 | Reference resume | `input/Bhuvan_Balagar_Resume-1.pdf` |
 | Analysis artefacts (git-ignored) | `output/alignment_evidence.json`, `output/resume_evidence.json` |
+| Environment spec | `environment.yml`, `requirements.txt` |
+| Environment bootstrap script | `scripts/setup_env.sh` |
+| Demo runner | `scripts/demo.py` |
+| Docker build context rules | `.dockerignore` |
 
 ---
 
 ## Current repository status
 
-- Branch `main`, tracking `origin/main`. Last commit: `6e50e01` *metadata updates*.
-- **Uncommitted work in the tree** (6 files) is a requirement-decomposition restructure of
-  the alignment machine: `decompose_requirements()` splits each requirement into
-  KeyBERT sub-phrases + NER entities; `alignment_machine()` embeds those sub-requirements
-  and returns up to `max_evidence_per_requirement` (now `10`) evidence rows per
-  sub-requirement; `AlignmentEvidence` gained a `sub_requirement` field.
-  This work is **incomplete and not yet correct** — see *Known gaps* below.
-- `tests/test_analyze.py` contains a **syntax error** (stray `w` after
-  `client.post(...)`) that aborts pytest collection, so **no test currently runs**.
-- The container image is missing the spaCy model `en_core_web_sm`, which
-  `keyphrase-vectorizers` requires. Without it, every KeyBERT call raises.
+- Branch `main`, tracking `origin/main`. Last commit: `0db1d42`
+  *Sync CURRENT_GOALS.md with Phase 0/1 and the subheader preprocessing fix*.
+- **Phase 0 is complete** (`b014ec8`) — test collection unblocked, `en_core_web_sm`
+  pinned into the Docker image, `pyproject.toml` added, whitespace-only diffs stripped.
+- **Phase 1 is complete** (`1ba0f94`, `68d999e`) — PDF line-wrap fragments are joined
+  back into their parent bullets, headings and `Label: value` subheaders are stripped
+  before NER/KeyBERT, and title lines are tagged as a separate `titles` source.
+  Verified: 21 bullets, 7 titles, 0 wrap fragments, 0 headings in the evidence pool;
+  heading-cited rows dropped 131 → 0.
+- **39 tests pass** in the conda development environment.
+- **The development environment is a conda env, not Docker.** See *Environment setup*.
+  The Docker build is reserved for the final MVP (Phase 9).
+- The remaining substantive work is **Phase 2** — see *Immediate next steps* at the top
+  of this file. The known gaps that Phase 2 and Phase 3 close are listed below.
 
 ---
 
@@ -258,6 +249,14 @@ Consequences, measured on `ai_engineer_memverge` with correct requirements injec
 This makes the system unexplainable: it can report that a resume matches
 *"Strong programming skills in Python"* citing *"project experience"*.
 
+**✅ RESOLVED in Phase 1** (`1ba0f94`, `68d999e`). `extract_evidence_lines()` now joins
+PDF line-wrap fragments into their parent bullet and strips bullet markers;
+`preprocess_for_semantic_extraction()` removes heading lines and `Label: value`
+subheader labels before NER and KeyBERT run; title/company/date lines are tagged as a
+separate `titles` source instead of competing as evidence. Verified: 21 bullets, 7 titles,
+0 wrap fragments, 0 headings in the pool; heading-cited rows 131 → 0. The *consequences*
+above (row volume, degenerate classification) remain and are closed by Phase 2.
+
 ### 3. No evidence floor, and selection by max-over-many
 
 `alignment_machine` no longer filters out low-similarity candidates, so every
@@ -268,7 +267,7 @@ classification is close to degenerate: across the five fixtures `matched` is 0�
 
 ### 4. NER was removed as an evidence source but is still specified
 
-The uncommitted work rejects `ner` as a resume-evidence source
+`alignment_machine` rejects `ner` as a resume-evidence source
 (`valid_sources = {"keybert", "bulletpoints"}`), while the design intent recorded in
 this file and in `PROJECT_CONTEXT.md` is that NER is a **first-class evidence source
 compared within itself**. The removal was a reaction to NER *displacing JD bullet
@@ -284,13 +283,17 @@ anything outside the taxonomy.
 
 ### 6. Smaller items
 
-- `requirements.txt` lists `spacy` but not the `en_core_web_sm` model the code needs.
 - `black` and `ruff` are in `requirements.txt`; `ruff` is the one worth keeping.
 - `python-dotenv` and `openai` are installed but unused — there is no LLM code yet.
 - `pypdf2` is unused (`pdfplumber` handles PDFs).
-- `.gitignore` ignores `input/`, but the two fixtures under it are already tracked.
-  Any *new* fixture would silently not be committed.
-- `output/` is git-ignored, so analysis artefacts are not versioned.
+- `output/` is git-ignored, so analysis artefacts are not versioned. Regenerate them
+  with `python scripts/demo.py`.
+- ✅ `.gitignore` no longer blanket-ignores `input/`. It now ignores `input/*` with
+  explicit negations for the two tracked fixtures, so a *new* fixture is committed by
+  adding its own negation line rather than by accident.
+- ✅ `.dockerignore` added, so the Phase 9 Docker build cannot pull local environments,
+  caches, generated artefacts or `.git/` into the image.
+
 
 ---
 
@@ -358,9 +361,7 @@ Ordered by dependency. Phases 0–3 make the pipeline *correct*; 4–6 make it *
 
 ### Phase 0 — Unblock the build (~30 min)
 
-**Step-by-step instructions, verification commands and the exact edits are in
-[Immediate next steps](#immediate-next-steps--phase-0) at the top of this document.
-Do that work first; this checklist is the summary.**
+**Complete** — committed as `b014ec8`. All 39 tests pass.
 
 - [x] Fix the `tests/test_analyze.py:39` syntax error so pytest can collect.
 - [x] Add `RUN python -m spacy download en_core_web_sm` to `.devcontainer/Dockerfile`
@@ -391,6 +392,9 @@ Do that work first; this checklist is the summary.**
 > floor is Phase 2 work.
 
 ### Phase 2 — Rebuild the alignment machine (~3 h)
+
+**This is the next phase.** Step-by-step instructions are in
+[Immediate next steps](#immediate-next-steps--phase-2) at the top of this document.
 
 - [ ] Implement per-source similarity matrices, compared within themselves.
 - [ ] Restore NER as a valid evidence source; remove the test asserting it raises.
@@ -461,11 +465,26 @@ Do that work first; this checklist is the summary.**
 ### Phase 8 — Polish (~1 h)
 
 - [ ] CI workflow running ruff + pytest.
-- [ ] `scripts/demo.py` — runs all five fixtures and prints a summary table. This is
+- [x] `scripts/demo.py` — runs all five fixtures and prints a summary table. This is
       the demo artefact.
-- [ ] `.gitignore`: stop ignoring the tracked `input/` fixtures.
+- [x] `.gitignore`: stop ignoring the tracked `input/` fixtures.
 - [ ] Trim `requirements.txt` (drop `black`, `pypdf2`; keep `spacy` but document the
       model download).
+
+### Phase 9 — Final Docker build for reproducibility (~1 h)
+
+**The Docker build is reserved for the end of the MVP.** Development happens in the
+conda environment; the image exists so the finished project can be reproduced and
+shipped by someone else.
+
+- [ ] Decide the layout: keep `.devcontainer/Dockerfile`, or promote it to a root-level
+      `Dockerfile` (the conventional shippable form) and retire `devcontainer.json`.
+- [ ] Review `.devcontainer/Dockerfile` against the conda-era reality: it still assumes
+      a devcontainer workflow and its `CMD` was removed.
+- [ ] Add a non-root user and a pinned base image.
+- [ ] `docker build` and verify the image starts, serves `/health`, and answers
+      `/analyze` with the spaCy model present.
+- [ ] Document the build and run commands in `README.md`.
 
 ---
 
@@ -478,8 +497,9 @@ Not in scope for the MVP. Listed so they are not lost.
   produce the final alignment score.
 - **Full LLM refinement.** LLM rewriting of bullets and summary *after* deterministic
   analysis, with explainability and no hallucination.
-- **Productionisation.** Secrets management for API keys, performance testing,
-  optional FAISS indexing for fast embedding lookups, container hardening.
+- **Productionisation.** Secrets management for API keys, performance testing, and
+  optional FAISS indexing for fast embedding lookups. *(The Docker image is Phase 9,
+  not deferred — see the MVP plan.)*
 - **Richer UX.** Sentence-level evidence display, resume export, better file-upload
   flows.
 - **Real NER.** Replace the regex taxonomy with a spaCy or transformer NER pass if
@@ -502,33 +522,74 @@ These hold across every change and are the core of the project's value propositi
 - **Tests.** Any change to analysis logic gets a focused test. Keep fixtures small.
 - **Documentation.** This file and `PROJECT_CONTEXT.md` are updated in the same commit
   as the code they describe.
+- **Docker is the final artefact, not the development loop.** Day-to-day work happens
+  in the conda environment. The image is built once at the end of the MVP so the
+  finished project can be reproduced by someone else.
 
 ---
 
 ## Environment setup
 
-The project runs inside the dev container. Dependencies are installed **globally** into
-the container image — there is no virtual environment in the container or on the host.
+**Development uses a conda environment. Docker is reserved for the final MVP build
+(Phase 9).** The environment lives outside the repository, so it never appears in the
+working tree.
 
 ```bash
-# Rebuild the container image after changing requirements.txt or the Dockerfile.
-# Then, inside the container:
+# One-time bootstrap — creates the env, installs the deps, installs the spaCy model.
+./scripts/setup_env.sh
+
+# Or do it by hand:
+conda create -n resume-ai python=3.10
+conda activate resume-ai
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+
+# Run
 python -m pytest
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Open http://127.0.0.1:8000/ for the UI.
 
-Two setup facts worth remembering:
+`environment.yml` describes the same environment declaratively. `requirements.txt`
+remains the single source of truth for Python dependencies, so the conda environment
+and the Docker image can never drift apart.
 
-- `en_core_web_sm` must be installed for KeyBERT to work. It is **not** on PyPI as a
-  normal dependency and is downloaded by `python -m spacy download en_core_web_sm`.
-  The Dockerfile does this as of Phase 0.
+### The spaCy model — required, and easy to forget
+
+`keyphrase-vectorizers` loads `en_core_web_sm`, which **is not a PyPI dependency and is
+not a conda package**. It must be downloaded separately:
+
+```bash
+python -m spacy download en_core_web_sm
+```
+
+Without it, `spacy.load("en_core_web_sm")` raises `OSError [E050]` and **every KeyBERT
+call fails** — the API still responds, but with no keyphrases and degraded evidence.
+`environment.yml` cannot carry this step, so `scripts/setup_env.sh` does it for you.
+The Dockerfile performs the same download.
+
+Verify it at any time:
+
+```bash
+python -c "import spacy; spacy.load('en_core_web_sm'); print('OK')"
+```
+
+### Other setup facts
+
 - The first request loads the `all-MiniLM-L6-v2` model and is slow. Subsequent requests
   reuse the cached model (`lru_cache` on `get_embedding_model`).
+- Environment variables: set `OPENAI_API_KEY` only if you want the OpenAI refinement
+  provider. The default local provider needs nothing.
+- `output/` is git-ignored and regenerated by `python scripts/demo.py`.
 
-Environment variables: set `OPENAI_API_KEY` only if you want the OpenAI refinement
-provider. The default local provider needs nothing.
+### Docker (Phase 9 — not the dev loop)
+
+`.devcontainer/Dockerfile` is the image recipe. It is **not** used for day-to-day
+development; it is built once the MVP is finished, so the project can be reproduced
+and shipped. `.dockerignore` keeps local environments, caches, generated artefacts and
+`.git/` out of the build context. See Phase 9 in the MVP plan for the remaining
+decisions (root `Dockerfile` vs `.devcontainer/`, non-root user, verification).
 
 ---
 
