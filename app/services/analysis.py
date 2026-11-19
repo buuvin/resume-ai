@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 
 from app.models.schemas import (
-    AnalysisResult,
     AlignmentEvidence,
+    AnalysisResult,
 )
 
 ABBREVIATIONS = {
@@ -122,7 +122,8 @@ RESUME_EVIDENCE_OUTPUT = (
 )
 
 def clean_text(text: str) -> str:
-    # Normalize visually similar Unicode characters so matching is consistent across copy/pasted text.
+    # Normalize visually similar Unicode characters so matching is consistent
+    # across copy/pasted text.
     text = unicodedata.normalize("NFKC", text or "")
     text = text.lower()
     text = re.sub(r"[^\w\s]", " ", text)
@@ -268,7 +269,11 @@ def parse_sections(text: str):
         key = None
         # detect heading if the line equals or starts with a known heading phrase
         for variant, section_key in heading_lookup.items():
-            if low == variant or low.startswith(variant + " ") or low.startswith(variant + ":"):
+            if (
+                low == variant
+                or low.startswith(variant + " ")
+                or low.startswith(variant + ":")
+            ):
                 key = section_key
                 break
 
@@ -293,7 +298,11 @@ def parse_sections(text: str):
 
 
 def _unique_strings(values: list[str] | set[str] | None) -> list[str]:
-    return list(dict.fromkeys(value.strip() for value in values or [] if value and value.strip()))
+    return list(
+        dict.fromkeys(
+            value.strip() for value in values or [] if value and value.strip()
+        )
+    )
 
 
 def _alignment_normalize(text: str) -> str:
@@ -508,7 +517,9 @@ def _summarize_alignment(
     underrepresented = {
         requirement
         for requirement, alignment in best_alignment_by_requirement.items()
-        if UNDERREPRESENTED_ALIGNMENT_THRESHOLD <= alignment < MATCHED_ALIGNMENT_THRESHOLD
+        if UNDERREPRESENTED_ALIGNMENT_THRESHOLD
+        <= alignment
+        < MATCHED_ALIGNMENT_THRESHOLD
     }
     missing = set(best_alignment_by_requirement) - matched - underrepresented
     score = (

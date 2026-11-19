@@ -1,7 +1,8 @@
 from io import BytesIO
 
-from reportlab.pdfgen import canvas
 from fastapi.testclient import TestClient
+from reportlab.pdfgen import canvas
+
 from app.main import app
 from app.services.analysis import extract_domain_entities
 
@@ -10,7 +11,8 @@ client = TestClient(app)
 
 def test_domain_entities_include_ai_engineering_concepts():
     entities = extract_domain_entities(
-        "Built an NLP system with an LLM using retrieval augmented generation for data science."
+        "Built an NLP system with an LLM using retrieval augmented "
+        "generation for data science."
     )
 
     assert entities["concepts"] == [
@@ -32,7 +34,10 @@ def make_pdf(text):
 def test_analyze_endpoint():
     payload = {
         "resume_text": "I built machine learning models using Python and pandas.",
-        "job_description_text": "Requirements\nPython\nMachine learning model development\nSQL experience",
+        "job_description_text": (
+            "Requirements\nPython\nMachine learning model development\n"
+            "SQL experience"
+        ),
         "supplemental_text": "Built SQL data pipelines for analytics.",
     }
 
@@ -79,7 +84,13 @@ def test_analyze_upload_extracts_pdf_resume():
     response = client.post(
         "/analyze-upload",
         data={"job_description_text": "Requirements\nPython"},
-        files={"resume_file": ("resume.pdf", make_pdf("Python developer"), "application/pdf")},
+        files={
+            "resume_file": (
+                "resume.pdf",
+                make_pdf("Python developer"),
+                "application/pdf",
+            )
+        },
     )
 
     assert response.status_code == 200

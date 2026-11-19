@@ -3,6 +3,7 @@ from typing import ClassVar
 
 import pytest
 
+from app.services.analysis import parse_sections
 from app.services.embeddings import (
     EmbeddedDocument,
     compare_bullet_embeddings,
@@ -12,7 +13,6 @@ from app.services.embeddings import (
     extract_keyphrases,
     split_document_lines,
 )
-from app.services.analysis import parse_sections
 
 
 class FakeEmbeddingModel:
@@ -60,7 +60,11 @@ class FakeBulletEmbeddingModel:
 
 
 def test_split_document_lines_omits_blank_lines():
-    assert split_document_lines("Skills\n\nPython\n  SQL  ") == ["Skills", "Python", "SQL"]
+    assert split_document_lines("Skills\n\nPython\n  SQL  ") == [
+        "Skills",
+        "Python",
+        "SQL",
+    ]
 
 
 def test_embed_document_stores_each_line_and_vector():

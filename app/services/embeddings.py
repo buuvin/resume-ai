@@ -253,17 +253,25 @@ def compare_bullet_embeddings(
 
 
 def print_bullet_similarity(result: BulletSimilarityResult) -> None:
-    """Print a human-readable report while retaining structured data for the pipeline."""
+    """Print a human-readable report while retaining structured data for the
+    pipeline."""
     print("[embeddings] resume/JD bullet similarity", flush=True)
     if not result.similarity_matrix:
         print("[embeddings] no matching resume or JD bullet sections found", flush=True)
         return
-    print(f"[embeddings] average similarity: {result.average_similarity:.4f}", flush=True)
-    for label, matches in (("top", result.top_matches), ("lowest", result.lowest_matches)):
+    print(
+        f"[embeddings] average similarity: {result.average_similarity:.4f}",
+        flush=True,
+    )
+    for label, matches in (
+        ("top", result.top_matches),
+        ("lowest", result.lowest_matches),
+    ):
         print(f"[embeddings] {label} matches:", flush=True)
         for match in matches:
             print(
-                f"  {match.similarity_score:.4f} | resume: {match.resume_bullet} | JD: {match.job_description_bullet}",
+                f"  {match.similarity_score:.4f} | resume: "
+                f"{match.resume_bullet} | JD: {match.job_description_bullet}",
                 flush=True,
             )
 

@@ -1,4 +1,12 @@
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
 from app.models.schemas import AnalyzeRequest, AnalyzeResponse, ImprovementResult
+from app.services.analysis import (
+    analyze_resume,
+    preprocess_for_semantic_extraction,
+    write_alignment_evidence,
+    write_resume_evidence,
+)
 from app.services.embeddings import (
     compare_bullet_embeddings,
     embed_document,
@@ -6,13 +14,6 @@ from app.services.embeddings import (
     print_bullet_similarity,
 )
 from app.services.ingestion import extract_upload_text
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from app.services.analysis import (
-    analyze_resume,
-    preprocess_for_semantic_extraction,
-    write_alignment_evidence,
-    write_resume_evidence,
-)
 
 router = APIRouter()
 
@@ -38,11 +39,13 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
             )
             # if embedded_document.lines:
             #     print( 
-            #         f"[embeddings] {document_name} first sentence: {embedded_document.lines[0]}",
+            #         f"[embeddings] {document_name} first sentence: "
+            #         f"{embedded_document.lines[0]}",
             #         flush=True,
             #     )
             #     print(
-            #         f"[embeddings] {document_name} embedding: {embedded_document.embeddings[0]}",
+            #         f"[embeddings] {document_name} embedding: "
+            #         f"{embedded_document.embeddings[0]}",
             #         flush=True,
             #     )
         bullet_similarity = compare_bullet_embeddings(
@@ -54,7 +57,8 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
         print_bullet_similarity(bullet_similarity)
     except ModuleNotFoundError as error:
         print(
-            f"[embeddings] unavailable: install the embedding and KeyBERT dependencies ({error.name})",
+            f"[embeddings] unavailable: install the embedding and "
+            f"KeyBERT dependencies ({error.name})",
             flush=True,
         )
 
@@ -76,14 +80,22 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
     )
     if analysis.missing_skills:
         top_gap_list = ", ".join(analysis.missing_skills[:3])
-        rewritten_summary = f"Emphasize direct experience with {top_gap_list} if it is supported by the resume or supplemental context."
+        rewritten_summary = (
+            f"Emphasize direct experience with {top_gap_list} "
+            f"if it is supported by the resume or supplemental context."
+        )
         explanations = [
-            "The backend is still using a deterministic baseline, so this summary only points to gaps identified from the submitted text.",
+            "The backend is still using a deterministic baseline, so this "
+            "summary only points to gaps identified from the submitted text.",
         ]
     else:
-        rewritten_summary = "The current resume already matches the submitted job description closely."
+        rewritten_summary = (
+            "The current resume already matches the submitted job "
+            "description closely."
+        )
         explanations = [
-            "This is a baseline analysis result and can later be replaced with an MLP or LLM-driven rewrite step.",
+            "This is a baseline analysis result and can later be replaced "
+            "with an MLP or LLM-driven rewrite step.",
         ]
 
     return AnalyzeResponse(

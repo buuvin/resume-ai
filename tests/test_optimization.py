@@ -8,7 +8,7 @@ from fastapi import UploadFile
 from app.models.schemas import AlignmentEvidence
 from app.services.analysis import (
     _alignment_normalize,
-    _flatten_entities,
+    _flatten_entities,  # noqa: F401  # kept for the Phase 2 NER evidence tests
     alignment_machine,
     decompose_requirements,
     extract_domain_entities,
@@ -85,7 +85,10 @@ def test_alignment_machine_uses_only_keybert_and_bulletpoint_evidence(monkeypatc
     ]
     assert [item.alignment for item in alignments] == [1.0, 0.0]
     assert all(item.requirement == "Python backend development" for item in alignments)
-    assert all(item.sub_requirement == "Python backend development" for item in alignments)
+    assert all(
+        item.sub_requirement == "Python backend development"
+        for item in alignments
+    )
 
 
 def test_alignment_machine_rejects_unknown_sources():
@@ -220,7 +223,9 @@ def test_alignment_against_job_description_cases():
     """Run every collected job description against the configured resume PDF."""
     resume_path = _find_resume_pdf()
     if resume_path is None:
-        pytest.skip("Add a resume PDF to input/ to run the fixture-driven alignment test")
+        pytest.skip(
+            "Add a resume PDF to input/ to run the fixture-driven alignment test"
+        )
 
     resume_text = _extract_resume_pdf(resume_path)
     assert resume_text, f"No text could be extracted from {resume_path}"
