@@ -9,67 +9,23 @@ Read this file for what is true *today*.
 
 ---
 
-## Immediate next steps — Phase 2
+## Immediate next steps — Phase 3
 
-**Do this next. Phases 0 and 1 are complete and committed.**
+**Do this next. Phases 0, 1 and 2 are complete and committed.**
 
 Phase 0 (`b014ec8`) unblocked the build. Phase 1 (`1ba0f94`, `68d999e`) fixed the
-resume evidence pool. What is left is the alignment machine itself: it still embeds
-every source against one mixed requirement pool, it has no evidence floor, and it
-scores by max-over-many.
+resume evidence pool. Phase 2 rebuilt the alignment machine: per-source similarity
+matrices, NER restored as an evidence source, an emission floor at `0.50`,
+cross-source de-duplication, and mean-over-sub-requirements scoring.
 
-Read the **Design spec: the alignment machine** section below before you start — it
-states the intended inputs, method, output contract, invariants and scoring rule.
+The analysis core is now sound. What is left is the **job-description requirement
+extractor** — see *Known gaps* #1 for the verified causes. Four of the five fixtures
+yield no requirements at all, and `Minimum Qualifications` is scored as if it were a
+requirement, so the product path still returns nothing for most real postings.
 
-### 1. Per-source similarity matrices, compared within themselves
-
-`app/services/analysis.py` → `alignment_machine()`
-
-Today one vector set is built from all decomposed sub-requirements and compared against
-each source in turn, so a NER entity ends up scored against KeyBERT phrases and against
-bullet evidence. Build one matrix per source, and compare the JD side of a source only
-against the resume side of that same source:
-
-| Matrix | JD side | Resume side |
-| --- | --- | --- |
-| bulletpoints | JD requirement bullets | resume bullets |
-| keybert | JD KeyBERT phrases | resume KeyBERT phrases |
-| ner | JD NER entities | resume NER entities |
-
-### 2. Restore NER as an evidence source
-
-`valid_sources` is currently `{"keybert", "bulletpoints"}`, and a test asserts that
-passing `ner` raises `ValueError`. NER was removed because it was displacing JD bullet
-points as the *requirements*. The fix is to keep JD bullets as the requirements and
-restore NER as its own evidence channel. Update that test to assert NER is accepted.
-
-### 3. Restore the minimum alignment floor
-
-`alignment_machine()` emits a row for every (sub-requirement × evidence) pair,
-regardless of similarity. Add a floor constant and drop rows below it — this is what
-removes the 96 %-junk rows. `UNDERREPRESENTED_ALIGNMENT_THRESHOLD` (0.45) is a
-*classification* threshold; consider a separate, higher constant for *emission*.
-
-### 4. De-duplicate evidence within a requirement, across sources
-
-The same resume sentence can currently be cited once per source. De-duplicate on the
-normalised evidence string within a requirement so one sentence cannot inflate a score.
-
-### 5. Apply the scoring rule
-
-A requirement's score is the **mean of the best alignment across its sub-requirements**,
-computed over evidence that passes the floor, with de-duplication applied first. A
-requirement with no qualifying evidence scores `0.0`. This replaces the current
-max-over-all-sub-requirements rule in `_summarize_alignment()`.
-
-### 6. Strengthen the fixture test
-
-`tests/test_optimization.py::test_alignment_against_job_description_cases` currently
-only asserts that evidence is non-empty and well-formed. Add assertions for:
-
-- row volume (the 500-row explosion must not come back)
-- requirement coverage against `expected_requirements`
-- no cited evidence is a heading or a line-wrap fragment
+The step-by-step checklist is **Phase 3 — Finish the paused JD extraction** in the
+MVP plan below. The fixture file `input/job_description_cases.json` is the ground
+truth: validate the extractor directly against `expected_requirements`.
 
 ### Verification
 
@@ -79,8 +35,10 @@ python scripts/demo.py
 ```
 
 `scripts/demo.py` runs all five fixture job descriptions against the reference resume
-and prints the summary table. Expect the row counts to fall sharply once the floor
-lands.
+and prints the summary table. Expect four rows at `0.00 / 0` until the extractor is
+fixed — that is the Phase 3 gap, not a pipeline failure. `data_scientist_altera`
+shows a small row count (33 as of Phase 2) with a low score: its extracted
+requirements are degree boilerplate that the resume only partially matches.
 
 ---
 
@@ -108,8 +66,8 @@ lands.
 
 ## Current repository status
 
-- Branch `main`, tracking `origin/main`. Last commit: `0db1d42`
-  *Sync CURRENT_GOALS.md with Phase 0/1 and the subheader preprocessing fix*.
+- Branch `main`, tracking `origin/main`. Last commit: `6eec2cf`
+  *test: rewrite spec-contradicting alignment tests and harden fixtures*.
 - **Phase 0 is complete** (`b014ec8`) — test collection unblocked, `en_core_web_sm`
   pinned into the Docker image, `pyproject.toml` added, whitespace-only diffs stripped.
 - **Phase 1 is complete** (`1ba0f94`, `68d999e`) — PDF line-wrap fragments are joined
@@ -117,11 +75,17 @@ lands.
   before NER/KeyBERT, and title lines are tagged as a separate `titles` source.
   Verified: 21 bullets, 7 titles, 0 wrap fragments, 0 headings in the evidence pool;
   heading-cited rows dropped 131 → 0.
-- **39 tests pass** in the conda development environment.
+- **Phase 2 is complete** (`dcfc255`, `6eec2cf`) — per-source similarity matrices, NER
+  restored as an evidence source, `MINIMUM_ALIGNMENT_FLOOR = 0.50`, cross-source
+  de-duplication within a requirement, and mean-over-sub-requirements scoring.
+  Verified: `data_scientist_altera` rows 280 → 33 (3 real citations, the rest
+  placeholders), fixture test passes for all five cases with ground-truth
+  requirements.
+- **41 tests pass** in the conda development environment.
 - **The development environment is a conda env, not Docker.** See *Environment setup*.
   The Docker build is reserved for the final MVP (Phase 9).
-- The remaining substantive work is **Phase 2** — see *Immediate next steps* at the top
-  of this file. The known gaps that Phase 2 and Phase 3 close are listed below.
+- The remaining substantive work is **Phase 3** — see *Immediate next steps* at the top
+  of this file. The known gaps that Phase 3 closes are listed below.
 
 ---
 
@@ -145,12 +109,16 @@ lands.
 - **Text normalisation**: Unicode NFKC, lowercasing, punctuation stripping, abbreviation
   expansion (`ml` → *machine learning*, `aws` → *amazon web services*, …), and a small
   synonym canonicalisation map (`SYNONYMS`).
-- **Alignment machine** (`alignment_machine`): embeds the requirements and the resume
-  evidence for each source, builds a cosine similarity matrix per source, and emits
-  `AlignmentEvidence` rows.
-- **Scoring** (`_summarize_alignment`): best alignment per requirement →
+- **Alignment machine** (`alignment_machine`): builds one cosine similarity matrix per
+  source and compares the JD side of a source only against the resume side of that
+  same source (bullets ↔ bullets, KeyBERT ↔ KeyBERT, NER ↔ NER). Rows below
+  `MINIMUM_ALIGNMENT_FLOOR` (0.50) are never emitted, evidence is de-duplicated
+  within a requirement across sources, and every sub-requirement without a surviving
+  citation gets a placeholder row (`evidence=""`).
+- **Scoring** (`_summarize_alignment`): best alignment per sub-requirement → mean
+  across *all* of a requirement's sub-requirements (uncovered ones count as `0.0`) →
   `matched` (≥ 0.70), `underrepresented` (0.45–0.70), `missing` (< 0.45);
-  `alignment_score` = mean of the per-requirement best alignments.
+  `alignment_score` = mean of the per-requirement scores.
 - **Extraction preprocessing** (`preprocess_for_semantic_extraction`): heading lines and
   `Label: value` subheader labels are removed before NER and KeyBERT run, so document
   furniture cannot rank as salient keyphrases.
@@ -204,7 +172,7 @@ with the reference resume:
 | Fixture | `alignment_evidence` rows | `alignment_score` |
 | --- | --- | --- |
 | `genai_engineer_python` | **0** | 0.00 |
-| `data_scientist_altera` | 280 | 0.66 |
+| `data_scientist_altera` | 33 | 0.04 |
 | `ai_engineer_memverge` | **0** | 0.00 |
 | `machine_learning_engineer_rzr_global` | **0** | 0.00 |
 | `ai_data_science_engineer_i` | **0** | 0.00 |
@@ -255,9 +223,10 @@ PDF line-wrap fragments into their parent bullet and strips bullet markers;
 subheader labels before NER and KeyBERT run; title/company/date lines are tagged as a
 separate `titles` source instead of competing as evidence. Verified: 21 bullets, 7 titles,
 0 wrap fragments, 0 headings in the pool; heading-cited rows 131 → 0. The *consequences*
-above (row volume, degenerate classification) remain and are closed by Phase 2.
+above (row volume, degenerate classification) were closed by **Phase 2** — the emission
+floor and per-slot cap took `data_scientist_altera` from 280 rows to 33.
 
-### 3. No evidence floor, and selection by max-over-many
+### 3. No evidence floor, and selection by max-over-many — resolved
 
 `alignment_machine` no longer filters out low-similarity candidates, so every
 requirement/sub-requirement pair produces a row regardless of relevance. Because the
@@ -265,7 +234,13 @@ best score per requirement is a **max over ~56 candidates**, the three-way
 classification is close to degenerate: across the five fixtures `matched` is 0–2,
 `underrepresented` is 2–9, and `missing` is almost never reached.
 
-### 4. NER was removed as an evidence source but is still specified
+**✅ RESOLVED in Phase 2** (`dcfc255`). `MINIMUM_ALIGNMENT_FLOOR = 0.50` drops rows
+below it (separate from the 0.45 classification threshold), and a requirement's score
+is now the mean of the best alignment across *all* its sub-requirements, with
+uncovered sub-requirements counting as `0.0`. Rows for `data_scientist_altera`
+280 → 33; only 3 of those clear the floor as real citations.
+
+### 4. NER was removed as an evidence source but is still specified — resolved
 
 `alignment_machine` rejects `ner` as a resume-evidence source
 (`valid_sources = {"keybert", "bulletpoints"}`), while the design intent recorded in
@@ -273,6 +248,11 @@ this file and in `PROJECT_CONTEXT.md` is that NER is a **first-class evidence so
 compared within itself**. The removal was a reaction to NER *displacing JD bullet
 points as the requirements* — the fix is to keep JD bullets as the requirements and
 restore NER as its own evidence channel, not to drop NER.
+
+**✅ RESOLVED in Phase 2** (`dcfc255`). `ner` is a valid source again, JD bullets stay
+the requirements, and `analyze_resume` now passes resume entities as NER evidence. In
+the current demo run NER is the strongest channel (two `1.0` citations: `data science`,
+`python`).
 
 ### 5. NER is not spaCy
 
@@ -299,8 +279,11 @@ anything outside the taxonomy.
 
 ## Design spec: the alignment machine
 
-This is the intended design, stated precisely. The current implementation does not yet
-match it.
+**✅ Implemented in Phase 2** (`dcfc255`). This is the design as stated; the code now
+matches it. Two decisions were resolved during implementation: the emission floor is
+`0.50` (higher than the 0.45 classification threshold, as the spec asks), and the
+scoring mean runs over *all* sub-requirements with uncovered ones counting as `0.0`
+— the explicit "scores `0.0`" case below then holds trivially.
 
 **Inputs**
 
@@ -384,32 +367,38 @@ Ordered by dependency. Phases 0–3 make the pipeline *correct*; 4–6 make it *
 
 > Verified follow-on for Phase 2: after the subheader-noise fix (heading-line
 > removal + `Label: value` separation via `preprocess_for_semantic_extraction`),
-> zero alignment rows cite heading strings. Remaining Phase 2 concerns: the
-> keybert channel can still surface single body-content words (e.g. `keywords`
-> from "identify critical skills, keywords, ...") — legitimate but thin
-> evidence, so the evidence floor and cross-source deduplication matter more
-> than further source filtering. Row volume (500) is unchanged because the
-> floor is Phase 2 work.
+> zero alignment rows cite heading strings. The keybert channel can still surface
+> single body-content words (e.g. `keywords` from "identify critical skills,
+> keywords, ...") — legitimate but thin evidence, which is exactly what the
+> emission floor and cross-source de-duplication now handle. *Phase 2 landed:
+> `data_scientist_altera` row volume 280 → 33.*
 
-### Phase 2 — Rebuild the alignment machine (~3 h)
+### Phase 2 — Rebuild the alignment machine (~3 h) — complete
 
-**This is the next phase.** Step-by-step instructions are in
-[Immediate next steps](#immediate-next-steps--phase-2) at the top of this document.
+**✅ Complete** (`dcfc255`, `6eec2cf`). The design and decisions are recorded under
+*Design spec: the alignment machine* above.
 
-- [ ] Implement per-source similarity matrices, compared within themselves.
-- [ ] Restore NER as a valid evidence source; remove the test asserting it raises.
-- [ ] Restore the minimum alignment floor so irrelevant rows are never emitted.
-- [ ] De-duplicate evidence within a requirement across sources.
+- [x] Implement per-source similarity matrices, compared within themselves.
+- [x] Restore NER as a valid evidence source; remove the test asserting it raises.
+      The test now asserts NER rows are emitted with `source="ner"`.
+- [x] Restore the minimum alignment floor so irrelevant rows are never emitted.
+      `MINIMUM_ALIGNMENT_FLOOR = 0.50`, separate from the 0.45 classification
+      threshold. A row at exactly 0.50 is kept; 0.493 is not.
+- [x] De-duplicate evidence within a requirement across sources, on the normalised
+      evidence string with a fixed source-priority tie-break.
 - [x] Exclude heading-like evidence strings from matching. *Done ahead of Phase 2 via
       `preprocess_for_semantic_extraction` (heading-line removal + `Label: value`
       separation); heading-cited rows dropped 131 → 0. Residual single-word keybert
       phrases from genuine body content (e.g. `keywords`) are left to the evidence
       floor, not source filtering.*
-- [ ] Apply the scoring rule above (mean over sub-requirements, floor applied).
-- [ ] Strengthen the fixture test: assert requirement coverage, row volume, and that
-      no cited evidence is a heading or a wrap fragment. *Partially done: the
-      heading-citation assertion is in place; row-volume and coverage assertions
-      remain.*
+- [x] Apply the scoring rule above (mean over sub-requirements, floor applied).
+      Uncovered sub-requirements count as `0.0` via placeholder rows, so the
+      denominator is every sub-requirement.
+- [x] Strengthen the fixture test: assert requirement coverage, row volume, and that
+      no cited evidence is a heading or a wrap fragment. *Now also asserts at least
+      one real citation per case (placeholders made the old non-empty check
+      vacuous), the per-slot cap, exact coverage in both directions, and
+      wrap-fragment heuristics.*
 
 ### Phase 3 — Finish the paused JD extraction (~2.5 h)
 

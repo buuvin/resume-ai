@@ -160,9 +160,11 @@ Compare the resume against the job description and identify:
 >   evidence rows dropped 131 → 0.
 > - **Open.** The job-description requirement extractor only recognises one section
 >   heading, so four of the five fixture postings yield no requirements at all.
-> - **Open.** The alignment machine has no evidence floor and scores by
->   max-over-many candidates, which makes the matched / underrepresented / missing
->   split close to degenerate.
+> - **Resolved (Phase 2, `dcfc255`).** The alignment machine now has an emission
+>   floor (`MINIMUM_ALIGNMENT_FLOOR = 0.50`, deliberately separate from the 0.45
+>   classification threshold) and scores each requirement as the mean of the best
+>   alignment across *all* its sub-requirements instead of max-over-many, so the
+>   matched / underrepresented / missing split reflects real coverage.
 >
 > **Entity extraction is regex-based**, matching against a hand-maintained taxonomy of
 > languages, frameworks, platforms, tools, databases and concepts. It is not spaCy NER,
@@ -424,19 +426,18 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 4. Embeddings, KeyBERT and NER extraction
 5. Alignment machine with cited evidence
 6. Clean resume evidence: bullet joining, heading/subheader stripping, tagged titles
-7. — *currently here* —
+7. Finish the alignment machine: per-source matrices, NER restored as an evidence
+   source, evidence floor, cross-source de-duplication, mean-over-sub-requirements
+   scoring
 
 **Remaining for the MVP**
 
-8. Finish the alignment machine: per-source matrices, NER restored as an evidence
-   source, evidence floor, cross-source de-duplication, mean-over-sub-requirements
-   scoring
-9. Correct the job-description requirement extraction
-10. Rebuild the optimization layer
-11. Add the LLM refinement layer with a working no-API-key default
-12. Surface evidence and recommendations in the frontend
-13. Align the documentation with the code
-14. Produce the final Docker image for reproducibility
+8. — *currently here* — Correct the job-description requirement extraction
+9. Rebuild the optimization layer
+10. Add the LLM refinement layer with a working no-API-key default
+11. Surface evidence and recommendations in the frontend
+12. Align the documentation with the code
+13. Produce the final Docker image for reproducibility
 
 ---
 
