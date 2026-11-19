@@ -114,6 +114,14 @@ SYNONYMS = {
 
 MATCHED_ALIGNMENT_THRESHOLD = 0.70
 UNDERREPRESENTED_ALIGNMENT_THRESHOLD = 0.45
+# Emission floor: rows below this are never cited. This is deliberately
+# separate from (and higher than) the classification thresholds above —
+# 0.45 decides how a requirement is labelled, 0.50 decides whether a piece
+# of evidence is strong enough to appear at all.
+MINIMUM_ALIGNMENT_FLOOR = 0.50
+# Fixed tie-break order when two sources cite the same evidence string at
+# the same alignment. The requirement channel wins, then KeyBERT, then NER.
+SOURCE_PRIORITY = ("bulletpoints", "keybert", "ner")
 ALIGNMENT_EVIDENCE_OUTPUT = (
     Path(__file__).resolve().parents[2] / "output" / "alignment_evidence.json"
 )
@@ -312,16 +320,27 @@ def _alignment_normalize(text: str) -> str:
     return SYNONYMS.get(normalized, normalized)
 
 
-def decompose_requirements(requirements: list[str]) -> dict[str, list[str]]:
-    """Extract KeyBERT phrases and NER entities for each original requirement."""
+def decompose_requirements(
+    requirements: list[str],
+) -> dict[str, dict[str, list[str]]]:
+    """Split each requirement into its KeyBERT phrases and NER entities.
+
+    Returns ``{requirement: {source: [sub-requirements]}}`` for the
+    decomposition sources only (``keybert`` and ``ner``). The
+    ``bulletpoints`` channel is not decomposed — a JD bullet *is* a
+    requirement, so its sub-requirement is the requirement itself;
+    ``alignment_machine`` fills that channel in.
+    """
     from app.services.embeddings import extract_keyphrases
 
     decomposed = {}
     for requirement in _unique_strings(requirements):
-        keybert_subrequirements = extract_keyphrases(requirement)
-        ner_subrequirements = _flatten_entities(extract_domain_entities(requirement))
-        subrequirements = _unique_strings(keybert_subrequirements + ner_subrequirements)
-        decomposed[requirement] = subrequirements or [requirement]
+        decomposed[requirement] = {
+            "keybert": _unique_strings(extract_keyphrases(requirement)),
+            "ner": _unique_strings(
+                _flatten_entities(extract_domain_entities(requirement))
+            ),
+        }
     return decomposed
 
 
@@ -329,11 +348,20 @@ def alignment_machine(
     resume_evidence: dict[str, list[str]],
     requirements: list[str],
     max_evidence_per_requirement: int = 10,
-    requirement_subrequirements: dict[str, list[str]] | None = None,
+    requirement_subrequirements: dict[str, dict[str, list[str]]] | None = None,
 ) -> list[AlignmentEvidence]:
-    """Rank bulletpoint and KeyBERT evidence against decomposed requirements."""
-    valid_sources = {"keybert", "bulletpoints"}
-    unknown_sources = set(resume_evidence) - valid_sources
+    """Rank resume evidence against decomposed requirements, per source.
+
+    Every source is only ever compared within itself: JD bullets against
+    resume bullets, JD KeyBERT phrases against resume KeyBERT phrases, JD
+    NER entities against resume NER entities. Rows below
+    ``MINIMUM_ALIGNMENT_FLOOR`` are never emitted, evidence is
+    de-duplicated within a requirement across sources so one resume
+    sentence cannot be cited twice, and each sub-requirement that ends up
+    with no cited evidence gets a placeholder row (``evidence=""``) so
+    scoring can count it as ``0.0``.
+    """
+    unknown_sources = set(resume_evidence) - set(SOURCE_PRIORITY)
     if unknown_sources:
         raise ValueError("resume_evidence contains an unknown source")
 
@@ -343,84 +371,129 @@ def alignment_machine(
     if not requirement_strings or max_evidence_per_requirement < 1:
         return []
 
-    subrequirements_by_requirement = requirement_subrequirements or {
-        requirement: [requirement] for requirement in requirement_strings
-    }
-    subrequirements_by_requirement = {
-        requirement: _unique_strings(
-            subrequirements_by_requirement.get(requirement) or [requirement]
+    decomposition = requirement_subrequirements or {}
+
+    # The JD side of each source, per requirement. A missing or empty
+    # decomposition falls back to the requirement itself, which guarantees
+    # every requirement has at least the bullet channel to stand on.
+    slots_by_requirement: dict[str, dict[str, list[str]]] = {}
+    for requirement in requirement_strings:
+        given = decomposition.get(requirement) or {}
+        slots_by_requirement[requirement] = {
+            source: _unique_strings(given.get(source)) or [requirement]
+            for source in SOURCE_PRIORITY
+        }
+
+    # Embed each source once: the union of its JD sub-requirements and its
+    # resume evidence. embed_document normalises its lines, so a dot
+    # product between the two sides is the cosine similarity.
+    jd_vectors_by_source: dict[str, dict[str, list[float]]] = {}
+    resume_by_source: dict[str, tuple[list[str], np.ndarray]] = {}
+    for source in SOURCE_PRIORITY:
+        jd_strings = _unique_strings(
+            [
+                slot
+                for requirement in requirement_strings
+                for slot in slots_by_requirement[requirement][source]
+            ]
         )
-        for requirement in requirement_strings
-    }
-    all_subrequirements = _unique_strings(
-        [
-            subrequirement
-            for requirement in requirement_strings
-            for subrequirement in subrequirements_by_requirement[requirement]
-        ]
-    )
-    requirement_document = embed_document("\n".join(all_subrequirements))
-    requirement_vectors = np.asarray(requirement_document.embeddings, dtype=float)
-    candidates_by_subrequirement = {item: [] for item in all_subrequirements}
-
-    for source in ("keybert", "bulletpoints"):
-        evidence_strings = _unique_strings(resume_evidence.get(source))
-        if not evidence_strings:
+        resume_strings = _unique_strings(resume_evidence.get(source))
+        if not jd_strings or not resume_strings:
             continue
 
-        evidence_document = embed_document("\n".join(evidence_strings))
-        evidence_vectors = np.asarray(evidence_document.embeddings, dtype=float)
-        if evidence_vectors.size == 0:
+        jd_document = embed_document("\n".join(jd_strings))
+        resume_document = embed_document("\n".join(resume_strings))
+        if not jd_document.embeddings or not resume_document.embeddings:
             continue
 
-        similarity_matrix = np.clip(requirement_vectors @ evidence_vectors.T, -1.0, 1.0)
-        for subrequirement_index, subrequirement in enumerate(all_subrequirements):
-            for evidence_index, evidence_item in enumerate(evidence_strings):
-                candidates_by_subrequirement[subrequirement].append(
-                    AlignmentEvidence(
-                        source=source,
-                        requirement="",
-                        sub_requirement=subrequirement,
-                        evidence=evidence_item,
-                        alignment=float(
-                            similarity_matrix[subrequirement_index, evidence_index]
-                        ),
-                        exact_match=(
-                            _alignment_normalize(subrequirement)
-                            == _alignment_normalize(evidence_item)
-                        ),
-                    )
-                )
+        jd_vectors_by_source[source] = dict(zip(jd_strings, jd_document.embeddings))
+        resume_by_source[source] = (
+            resume_strings,
+            np.asarray(resume_document.embeddings, dtype=float),
+        )
 
-    alignments = []
-    for requirement_item in requirement_strings:
-        for subrequirement in subrequirements_by_requirement[requirement_item]:
-            candidates = sorted(
-                candidates_by_subrequirement[subrequirement],
-                key=lambda item: item.alignment,
-                reverse=True,
-            )
-            selected = []
-            seen_evidence = set()
-            for candidate in candidates:
-                normalized_evidence = _alignment_normalize(candidate.evidence)
-                if normalized_evidence in seen_evidence:
-                    continue
-                candidate.requirement = requirement_item
-                selected.append(candidate)
-                seen_evidence.add(normalized_evidence)
-                if len(selected) >= max_evidence_per_requirement:
-                    break
-
-            if selected:
-                alignments.extend(selected)
+    alignments: list[AlignmentEvidence] = []
+    for requirement in requirement_strings:
+        # Every floor-passing row for this requirement, across sources.
+        candidates: list[AlignmentEvidence] = []
+        for source in SOURCE_PRIORITY:
+            resume_entry = resume_by_source.get(source)
+            jd_vectors = jd_vectors_by_source.get(source)
+            if resume_entry is None or jd_vectors is None:
                 continue
+            resume_strings, resume_matrix = resume_entry
+            slot_strings = slots_by_requirement[requirement][source]
+            jd_matrix = np.asarray(
+                [jd_vectors[slot] for slot in slot_strings], dtype=float
+            )
+            similarity = np.clip(jd_matrix @ resume_matrix.T, -1.0, 1.0)
+            for slot_index, slot in enumerate(slot_strings):
+                for evidence_index, evidence_item in enumerate(resume_strings):
+                    alignment = float(similarity[slot_index, evidence_index])
+                    if alignment < MINIMUM_ALIGNMENT_FLOOR:
+                        continue
+                    candidates.append(
+                        AlignmentEvidence(
+                            source=source,
+                            requirement=requirement,
+                            sub_requirement=slot,
+                            evidence=evidence_item,
+                            alignment=alignment,
+                            exact_match=(
+                                _alignment_normalize(slot)
+                                == _alignment_normalize(evidence_item)
+                            ),
+                        )
+                    )
 
+        # De-duplicate across sources within this requirement: a single
+        # resume sentence is cited by whichever row aligns with it most
+        # strongly, and never twice.
+        candidates.sort(
+            key=lambda item: (
+                -item.alignment,
+                SOURCE_PRIORITY.index(item.source),
+                item.evidence,
+                item.sub_requirement,
+            )
+        )
+        seen_evidence: set[str] = set()
+        deduped: list[AlignmentEvidence] = []
+        for candidate in candidates:
+            normalized_evidence = _alignment_normalize(candidate.evidence)
+            if normalized_evidence in seen_evidence:
+                continue
+            seen_evidence.add(normalized_evidence)
+            deduped.append(candidate)
+
+        # Keep the top rows of each sub-requirement for the audit
+        # artefact; scoring only ever reads a sub-requirement's best row.
+        selected_by_sub_requirement: dict[str, list[AlignmentEvidence]] = {}
+        for candidate in deduped:
+            rows = selected_by_sub_requirement.setdefault(
+                candidate.sub_requirement, []
+            )
+            if len(rows) < max_evidence_per_requirement:
+                rows.append(candidate)
+
+        # Emit each sub-requirement once, in a stable order, and give the
+        # ones with no cited evidence a placeholder so they still count.
+        emitted_sub_requirements: list[str] = []
+        for source in SOURCE_PRIORITY:
+            for slot in slots_by_requirement[requirement][source]:
+                if slot not in emitted_sub_requirements:
+                    emitted_sub_requirements.append(slot)
+
+        for slot in emitted_sub_requirements:
+            rows = selected_by_sub_requirement.get(slot)
+            if rows:
+                alignments.extend(rows)
+                continue
             alignments.append(
                 AlignmentEvidence(
                     source="bulletpoints",
-                    requirement=requirement_item,
-                    sub_requirement=subrequirement,
+                    requirement=requirement,
+                    sub_requirement=slot,
                     evidence="",
                     alignment=0.0,
                     exact_match=False,
@@ -501,13 +574,31 @@ def write_resume_evidence(
 def _summarize_alignment(
     alignment_evidence: list[AlignmentEvidence],
 ) -> tuple[list[str], list[str], list[str], float]:
-    """Summarize semantic evidence without falling back to token extraction."""
-    best_alignment_by_requirement = {}
+    """Summarize semantic evidence without falling back to token extraction.
+
+    A requirement's score is the mean of the best alignment across *all*
+    of its sub-requirements; a sub-requirement with no cited evidence
+    (a placeholder row) counts as ``0.0``. The overall score is the mean
+    of those requirement scores.
+    """
+    best_alignment_by_sub_requirement: dict[tuple[str, str], float] = {}
     for item in alignment_evidence:
-        best_alignment_by_requirement[item.requirement] = max(
-            best_alignment_by_requirement.get(item.requirement, 0.0),
+        key = (item.requirement, item.sub_requirement)
+        best_alignment_by_sub_requirement[key] = max(
+            best_alignment_by_sub_requirement.get(key, 0.0),
             item.alignment,
         )
+
+    alignments_by_requirement: dict[str, list[float]] = {}
+    for (requirement, _sub_requirement), alignment in (
+        best_alignment_by_sub_requirement.items()
+    ):
+        alignments_by_requirement.setdefault(requirement, []).append(alignment)
+
+    best_alignment_by_requirement = {
+        requirement: sum(alignments) / len(alignments)
+        for requirement, alignments in alignments_by_requirement.items()
+    }
 
     matched = {
         requirement
@@ -545,6 +636,7 @@ def analyze_resume(
     requirement_strings = getattr(bullet_similarity, "job_description_bullets", [])
     alignment_evidence = alignment_machine(
         {
+            "ner": _flatten_entities(resume_entities),
             "keybert": list(resume_keyphrases or []),
             "bulletpoints": getattr(bullet_similarity, "resume_bullets", []),
         },
