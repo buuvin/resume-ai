@@ -58,7 +58,7 @@ def test_analyze_endpoint():
     assert data["analysis"]["alignment_evidence"]
     assert {
         item["source"] for item in data["analysis"]["alignment_evidence"]
-    } <= {"keybert", "bulletpoints"}
+    } <= {"ner", "keybert", "bulletpoints"}
     assert all(
         item["requirement"] in {
             "Python",
