@@ -114,11 +114,15 @@ SYNONYMS = {
 
 MATCHED_ALIGNMENT_THRESHOLD = 0.70
 UNDERREPRESENTED_ALIGNMENT_THRESHOLD = 0.45
-# Emission floor: rows below this are never cited. This is deliberately
-# separate from (and higher than) the classification thresholds above —
-# 0.45 decides how a requirement is labelled, 0.50 decides whether a piece
-# of evidence is strong enough to appear at all.
-MINIMUM_ALIGNMENT_FLOOR = 0.50
+# Emission floor per source: rows below their source's floor are never
+# cited. Deliberately separate from the classification thresholds above —
+# 0.45 decides how a requirement is labelled, the floor decides whether a
+# piece of evidence is strong enough to appear at all. Per-source because
+# the channels operate at different granularities: bullet-channel pairs
+# (whole sentences) measure 0.42-0.56 on genuine matches, while KeyBERT
+# phrases and NER entities reach 0.7-1.0 (measured across the five
+# fixture cases in input/job_description_cases.json).
+EMISSION_FLOORS = {"bulletpoints": 0.40, "keybert": 0.50, "ner": 0.50}
 # Fixed tie-break order when two sources cite the same evidence string at
 # the same alignment. The requirement channel wins, then KeyBERT, then NER.
 SOURCE_PRIORITY = ("bulletpoints", "keybert", "ner")
@@ -354,8 +358,8 @@ def alignment_machine(
 
     Every source is only ever compared within itself: JD bullets against
     resume bullets, JD KeyBERT phrases against resume KeyBERT phrases, JD
-    NER entities against resume NER entities. Rows below
-    ``MINIMUM_ALIGNMENT_FLOOR`` are never emitted, evidence is
+    NER entities against resume NER entities. Rows below their source's
+    ``EMISSION_FLOORS`` entry are never emitted, evidence is
     de-duplicated within a requirement across sources so one resume
     sentence cannot be cited twice, and each sub-requirement that ends up
     with no cited evidence gets a placeholder row (``evidence=""``) so
@@ -430,7 +434,7 @@ def alignment_machine(
             for slot_index, slot in enumerate(slot_strings):
                 for evidence_index, evidence_item in enumerate(resume_strings):
                     alignment = float(similarity[slot_index, evidence_index])
-                    if alignment < MINIMUM_ALIGNMENT_FLOOR:
+                    if alignment < EMISSION_FLOORS[source]:
                         continue
                     candidates.append(
                         AlignmentEvidence(
