@@ -9,15 +9,48 @@ Read this file for what is true *today*.
 
 ---
 
-## Immediate next steps — Phase 3
+## Immediate next steps — Phase 4
 
-**Do this next. Phases 0, 1, 2 and 2.5 are complete and committed.**
+**Do this next. Phases 0, 1, 2, 2.5 and 3 are complete and committed.**
 
 Phase 0 (`b014ec8`) unblocked the build. Phase 1 (`1ba0f94`, `68d999e`) fixed the
-resume evidence pool. Phase 2 rebuilt the alignment machine: per-source similarity
-matrices, NER restored as an evidence source, an emission floor, cross-source
-de-duplication, and mean-over-sub-requirements scoring. Phase 2.5 calibrated the
-floor per source after measurements showed the uniform 0.50 sat above the data.
+resume evidence pool. Phase 2 rebuilt the alignment machine (per-source similarity
+matrices, NER restored, emission floor, cross-source de-duplication,
+mean-over-sub-requirements scoring). Phase 2.5 calibrated the floor per source.
+Phase 3 landed the job-description requirement extractor — the product path now
+produces evidence for **all five fixtures** (previously 4 of 5 returned zero rows).
+
+### Phase 3 — JD requirement extraction — complete (`a73af2c`, `687e8eb`)
+
+- New `app/services/requirements.py` → `extract_requirements(jd)` returns required
+  and preferred groups with stored weights (1.0 / 0.5). Sections mode when the
+  posting has a recognised required heading; fallback harvest when it does not
+  (memverge has none).
+- Validated against `input/job_description_cases.json`: **recall 1.000 /
+  precision 1.000** for both groups across all five fixtures — pinned in
+  `tests/test_requirements.py` at recall ≥ 0.95, precision ≥ 0.90.
+- `parse_sections` hardened: bullet-marker lines are never headings, heading
+  matches are whole-line only. This was gap #1's cause — prefix matching swallowed
+  requirement bullets like "Experience with Git …" and dropped their text.
+- Route wiring: required texts feed `compare_bullet_embeddings` through the new
+  `job_bullets` parameter, so the similarity matrix and the alignment machine see
+  identical strings; preferred surfaces as `AnalysisResult.preferred_requirements`.
+
+| demo case | before Phase 3 | after Phase 3 |
+| --- | --- | --- |
+| `genai_engineer_python` | 0 rows | 19 rows, 0.23 |
+| `data_scientist_altera` | 33 rows, 0.06 | 50 rows, 0.10 |
+| `ai_engineer_memverge` | 0 rows | 62 rows, 0.09 |
+| `machine_learning_engineer_rzr_global` | 0 rows | 97 rows, 0.24 |
+| `ai_data_science_engineer_i` | 0 rows | 86 rows, 0.14 |
+
+### Open decision before Phase 4 — R1 slot dilution
+
+Scores remain low (0.09–0.24) because of the Phase 2.5 finding (cause 2): each
+requirement decomposes into ~6–10 sub-requirement slots, so R1 means land at
+≈ 0.1–0.2 and most requirements classify `missing`. Candidate options (top-k mean
+instead of full mean, slot grouping, threshold changes) will be brought back
+**with measurements** before anything changes.
 
 ### Phase 2.5 — evidence density — complete (`23ff9a2`, `82acb68`)
 
@@ -47,25 +80,8 @@ Placeholder rows unchanged (added after the floor).
 | demo `data_scientist_altera` | 33 rows, 0.04 | 33 rows, 0.06 |
 
 The 22 bullet rows match the predicted qualifying-pair count at 0.40 exactly (the
-channel contributed ≤ 2 rows before). **Still open, needs a decision with numbers:**
-R1 slot dilution (cause 2) remains — most requirement means still classify `missing`.
-Options will be brought back with measurements before any threshold change.
-
-### Phase 3 — JD requirement extraction (planned)
-
-See the **Phase 3** checklist in the MVP plan below for the full steps. Decisions
-locked during planning:
-
-- Extractor returns **both** required and preferred groups with weights (weights are
-  stored data; consuming them in scoring is Phase 4); alignment consumes **required
-  only**; preferred surfaces as a new optional `AnalysisResult` field; both groups are
-  validated against `expected_requirements` / `expected_preferred` ground truth.
-- `parse_sections` hardening (bullet-marker lines never headings, whole-line matches
-  only) and an extended `HEADING_VARIANTS` map, plus a new
-  `app/services/requirements.py` with a fallback harvest derived from memverge's
-  ground truth.
-- The fixture test's ground-truth injection (`test_alignment_against_job_description_cases`)
-  stays untouched — analysis and extraction remain isolated from each other.
+channel contributed ≤ 2 rows before). The R1 dilution half of the finding remains
+open — see *Open decision* above.
 
 ### Verification
 
@@ -76,10 +92,9 @@ ruff check .
 ```
 
 `scripts/demo.py` runs all five fixture job descriptions against the reference resume
-and prints the summary table. Expect four rows at `0.00 / 0` until the extractor is
-fixed — that is the Phase 3 gap, not a pipeline failure. `data_scientist_altera`
-shows a small row count (33 as of Phase 2) with a low score: its extracted
-requirements are degree boilerplate that the resume only partially matches.
+and prints the summary table. All five rows are non-zero since Phase 3; scores stay
+in the 0.09–0.24 range because of the open R1 dilution question above, not because
+of missing requirements.
 
 ---
 
@@ -107,8 +122,8 @@ requirements are degree boilerplate that the resume only partially matches.
 
 ## Current repository status
 
-- Branch `main`, tracking `origin/main`. Last commit: `82acb68`
-  *test: pin per-source emission floors*.
+- Branch `main`, tracking `origin/main`. Last commit: `687e8eb`
+  *test: validate the requirement extractor against fixture ground truth*.
 - **Phase 0 is complete** (`b014ec8`) — test collection unblocked, `en_core_web_sm`
   pinned into the Docker image, `pyproject.toml` added, whitespace-only diffs stripped.
 - **Phase 1 is complete** (`1ba0f94`, `68d999e`) — PDF line-wrap fragments are joined
@@ -127,11 +142,17 @@ requirements are degree boilerplate that the resume only partially matches.
   isolated path: slots with evidence 50 → 62 of 286, real citation rows 70 → 90
   (bulletpoints 0 → 22), per-case coverage 8–27 % → 10–34 %; classification
   thresholds (0.70 / 0.45) deliberately untouched.
-- **42 tests pass** in the conda development environment.
+- **Phase 3 is complete** (`a73af2c`, `687e8eb`) — new
+  `app/services/requirements.py` extracts required and preferred requirement groups
+  (sections mode under recognised headings, fallback harvest otherwise); validated
+  against fixture ground truth at recall 1.000 / precision 1.000 for both groups;
+  `parse_sections` hardened so bullet lines are never headings. Verified: demo 5/5
+  non-zero (previously 4 of 5 at zero rows).
+- **50 tests pass** in the conda development environment.
 - **The development environment is a conda env, not Docker.** See *Environment setup*.
   The Docker build is reserved for the final MVP (Phase 9).
-- The remaining substantive work is **Phase 3** — see *Immediate next steps* at the top
-  of this file. The known gaps that Phase 3 closes are listed below.
+- The remaining substantive work is **Phase 4** — see *Immediate next steps* at the top
+  of this file. The one open decision (R1 slot dilution) is listed under *Open decisions*.
 
 ---
 
@@ -151,7 +172,19 @@ requirements are degree boilerplate that the resume only partially matches.
   dependency of `keyphrase-vectorizers`.
 - **Section parsing** (`parse_sections`): splits a document into `summary`, `skills`,
   `experience`, `projects`, `education`, `certifications`, `requirements`
-  (aliases: *requirement*, *qualifications*, *qualification*) and `preferred`.
+  (aliases: *requirement*, *qualifications*, *qualification*, *minimum qualifications*,
+  *must have*) and `preferred` (incl. *preferred qualifications*, *soft skills*,
+  *bonus points*). Heading matches are whole-line only and bullet-marker lines are
+  never headings.
+- **JD requirement extraction** (`app/services/requirements.py`,
+  `extract_requirements`): splits a posting into `required` (weight 1.0) and
+  `preferred` (weight 0.5) groups. Sections mode when a recognised required heading
+  exists (bullets and plain content lines under required/preferred headings count);
+  fallback harvest otherwise (every non-preferred, non-excluded bullet). Validated
+  against `input/job_description_cases.json`: recall/precision 1.000 for both
+  groups across all five fixtures. The route feeds the required texts into
+  `compare_bullet_embeddings` via `job_bullets`, and preferred surfaces as
+  `AnalysisResult.preferred_requirements` (weights stored for Phase 4).
 - **Text normalisation**: Unicode NFKC, lowercasing, punctuation stripping, abbreviation
   expansion (`ml` → *machine learning*, `aws` → *amazon web services*, …), and a small
   synonym canonicalisation map (`SYNONYMS`).
@@ -198,11 +231,12 @@ chips, KeyBERT phrases, domain entities, and a stub improvement summary.
 
 ### Tests
 
-Four modules, 39 tests, covering the endpoint, upload ingestion, section parsing,
+Five modules, 50 tests, covering the endpoint, upload ingestion, section parsing,
 heading/subheader preprocessing, embeddings, KeyBERT wiring, bullet joining, normalisation,
-alignment-machine behaviour and a fixture-driven run over all five job descriptions.
+alignment-machine behaviour, a fixture-driven run over all five job descriptions, and the
+requirement extractor's recall/precision against that same fixture's ground truth.
 
-> All tests pass as of the Phase 0/1 work (verified in the container: 39 passed).
+> All 50 tests pass as of Phase 3 (verified 2026-11-23).
 
 ---
 
@@ -210,41 +244,62 @@ alignment-machine behaviour and a fixture-driven run over all five job descripti
 
 These were confirmed by running the pipeline, not inferred from reading the code.
 
-### 1. The product path returns nothing for most real job descriptions — critical
+### 1. The product path returns nothing for most real job descriptions — ✅ RESOLVED (Phase 3)
 
-Running `/analyze` against the five fixtures in `input/job_description_cases.json`
-with the reference resume:
+**✅ RESOLVED in Phase 3** (`a73af2c`, `687e8eb`). All three causes are closed:
+
+1. The route now calls `extract_requirements()` — the single source of truth for JD
+   requirements — and passes the required texts to `compare_bullet_embeddings` via the
+   new `job_bullets` parameter. Sections mode handles recognised headings (*Qualifications*,
+   *Minimum Qualifications*, *Technical Skills*, …); a fallback harvest handles postings
+   with no recognised required heading (`ai_engineer_memverge`).
+2. `parse_sections` no longer prefix-matches headings: a bullet-marker line is never a
+   heading and heading matches are whole-line only, so requirement bullets like
+   *Experience with statistical analysis, …* survive with their text intact.
+3. *Minimum Qualifications* (and *must have*, *preferred qualifications*, *soft skills*,
+   *bonus points*) were added to `HEADING_VARIANTS`.
+
+Verified against `input/job_description_cases.json` ground truth: **recall 1.000 /
+precision 1.000** for both required and preferred groups across all five fixtures
+(pinned in `tests/test_requirements.py` at recall ≥ 0.95, precision ≥ 0.90). Demo after
+Phase 3:
 
 | Fixture | `alignment_evidence` rows | `alignment_score` |
 | --- | --- | --- |
-| `genai_engineer_python` | **0** | 0.00 |
-| `data_scientist_altera` | 33 | 0.04 |
-| `ai_engineer_memverge` | **0** | 0.00 |
-| `machine_learning_engineer_rzr_global` | **0** | 0.00 |
-| `ai_data_science_engineer_i` | **0** | 0.00 |
+| `genai_engineer_python` | 19 | 0.23 |
+| `data_scientist_altera` | 50 | 0.10 |
+| `ai_engineer_memverge` | 62 | 0.09 |
+| `machine_learning_engineer_rzr_global` | 97 | 0.24 |
+| `ai_data_science_engineer_i` | 86 | 0.14 |
 
-Three compounding causes:
+The scores stay low (0.09–0.24) because of R1 slot dilution — an open decision, not an
+extraction failure.
 
-1. **Only one JD section is read.** `app/routes/analyze.py` calls
+<details>
+<summary>Original diagnosis (superseded, kept for context)</summary>
+
+1. **Only one JD section was read.** The route called
    `compare_bullet_embeddings(..., job_section_names={"requirements"})`. Real job
    descriptions use *Qualifications*, *Technical Skills*, *Minimum Qualifications*,
    *What We are Looking For*, or no recognised heading at all. `ai_engineer_memverge`
-   has no recognised heading, so nothing is extracted even with a broader section set.
-2. **Bullets are misclassified as section headings.** `parse_sections` matches a heading
-   when the normalised line *starts with* a heading word. Because normalisation strips
-   punctuation, the bullet `- Experience with statistical analysis, …` becomes
-   `experience with statistical analysis …`, matches the `experience` variant, and
-   **terminates the requirements section**. Seven bullets across four fixtures are
+   had no recognised heading, so nothing was extracted even with a broader section set.
+2. **Bullets were misclassified as section headings.** `parse_sections` matched a heading
+   when the normalised line *started with* a heading word, so the bullet
+   `- Experience with statistical analysis, …` matched the `experience` variant and
+   **terminated the requirements section**. Seven bullets across four fixtures were
    swallowed this way.
-3. **`Minimum Qualifications` is treated as a requirement** rather than a heading, and
-   therefore appears as a scored requirement in the output.
+3. **`Minimum Qualifications` was treated as a requirement** rather than a heading, and
+   therefore appeared as a scored requirement in the output.
 
-> The fixture test does not catch this: `test_alignment_against_job_description_cases`
-> injects `case["expected_requirements"]` directly, bypassing the extractor entirely.
-> That was deliberate — the JD extraction was paused while the analysis core was being
-> validated — but it means the extractor is currently untested against ground truth.
+The fixture test did not catch this: `test_alignment_against_job_description_cases`
+injects `case["expected_requirements"]` directly, bypassing the extractor. That
+isolation is deliberate and remains (analysis and extraction are validated
+independently) — the extractor now has its own ground-truth tests in
+`tests/test_requirements.py`.
 
-### 2. The resume evidence pool is mostly garbage — critical
+</details>
+
+### 2. The resume evidence pool is mostly garbage — ✅ RESOLVED (Phase 1)
 
 `extract_bullet_points` returns **46** strings for the reference resume, of which only
 **21 are real bullets**. The other **25 are PDF line-wrap fragments** such as
@@ -451,34 +506,36 @@ Ordered by dependency. Phases 0–3 make the pipeline *correct*; 4–6 make it *
       vacuous), the per-slot cap, exact coverage in both directions, and
       wrap-fragment heuristics.*
 
-### Phase 3 — Finish the paused JD extraction (~2.5 h)
+### Phase 3 — Finish the paused JD extraction (~2.5 h) — complete (`a73af2c`, `687e8eb`)
 
 *Prerequisite: Phase 2.5 (evidence-density fix) — see* Immediate next steps *above.*
 
-- [ ] New `app/services/requirements.py`.
-- [ ] Extend the heading map: *what you will do*, *what we are looking for*,
-      *key responsibilities*, *minimum qualifications*, *preferred qualifications*,
-      *technical skills*, *role overview*, *bonus points*, *nice to have*, *must have*.
-- [ ] Fix `parse_sections`: a line beginning with `-`, `•`, `●` or `*` is never a
+- [x] New `app/services/requirements.py`.
+- [x] Extend the heading map: *minimum qualifications*, *must have*,
+      *preferred qualifications*, *soft skills*, *bonus points*. *Deliberately not
+      added:* responsibility-style headings (*key responsibilities*, *role overview*,
+      *what you will do*, *what we are looking for*) — they must stay unclaimed so
+      sections mode ignores them and the fallback can harvest them.*
+- [x] Fix `parse_sections`: a line beginning with `-`, `•`, `●` or `*` is never a
       heading; heading matches must be whole-line, not prefix.
-- [ ] Treat *Minimum Qualifications* / *Preferred Qualifications* as headings.
-- [ ] Fallback: harvest requirement-shaped lines when no requirements section exists.
-      Derive the heuristic from memverge's ground truth (`ai_engineer_memverge` has no
-      recognized heading); gate it behind the precision test so it cannot reintroduce
-      junk requirements.
-- [ ] Group requirements as `required` vs `preferred`, with weights. *Decision: the
+- [x] Treat *Minimum Qualifications* / *Preferred Qualifications* as headings.
+- [x] Fallback: harvest requirement-shaped lines when no requirements section exists.
+      Derived from memverge's ground truth; gated behind the precision test so it
+      cannot reintroduce junk requirements (precision 1.000 measured).
+- [x] Group requirements as `required` vs `preferred`, with weights. *Decision: the
       extractor returns both groups; alignment consumes **required only** (aligning
       preferred too would double slot counts and worsen the R1 dilution); preferred
-      surfaces as a new optional `AnalysisResult` field; weights are stored data —
+      surfaces as `AnalysisResult.preferred_requirements`; weights are stored data —
       consuming them in scoring is Phase 4.*
-- [ ] Wire the route: required lines feed `compare_bullet_embeddings` through an
+- [x] Wire the route: required lines feed `compare_bullet_embeddings` through the
       optional `job_bullets` parameter so alignment and the similarity matrix see
-      identical strings; drop `job_section_names={"requirements"}` from
+      identical strings; `job_section_names={"requirements"}` dropped from
       `app/routes/analyze.py`.
-- [ ] Validate the extractor directly against `expected_requirements` **and**
-      `expected_preferred` in `input/job_description_cases.json` — that file is the
-      ground truth. *Measure recall/precision first, then pin thresholds.* The fixture
-      test's ground-truth injection stays untouched (analysis/extraction isolation).
+- [x] Validate the extractor directly against `expected_requirements` **and**
+      `expected_preferred` in `input/job_description_cases.json`. *Measured
+      recall/precision 1.000/1.000 for both groups; pinned at recall ≥ 0.95,
+      precision ≥ 0.90.* The fixture test's ground-truth injection stays untouched
+      (analysis/extraction isolation).
 
 ### Phase 4 — Optimization layer (~3 h)
 
@@ -650,15 +707,21 @@ decisions (root `Dockerfile` vs `.devcontainer/`, non-root user, verification).
 
 ## Open decisions
 
-1. **Preferred requirements** — score them at a lower weight, or exclude them from the
-   score and surface them only in the optimization queue? Each fixture has 6–8
-   `expected_preferred` entries, so this materially changes the headline number.
-   *Current assumption: lower weight.*
-2. **Evidence floor value** — `0.45` is inherited from the old classification
-   thresholds. It may want to be a separate, higher constant once resume bullets are
-   clean.
+1. **R1 slot dilution (blocks Phase 4 design)** — each requirement decomposes into
+   ~6–10 sub-requirement slots, so R1 means land at ≈ 0.09–0.24 and most requirements
+   classify `missing` even with correct evidence. Candidates: top-k mean instead of a
+   full mean, slot grouping, or threshold changes. *Must be decided with measurements —
+   see* Immediate next steps *above.*
+2. **Preferred requirements** — score them at a lower weight (extractor stores 0.5), or
+   exclude them from the score and surface them only in the optimization queue? Each
+   fixture has 1–22 `expected_preferred` entries, so this materially changes the
+   headline number. *Current assumption: lower weight; consumption is Phase 4.*
+   **✅ extraction half resolved in Phase 3** — both groups are extracted and validated.
 3. **Supplemental text** — currently extracted for entities and keyphrases but never
    enters the alignment. Either feed it in as a separate, flagged evidence source, or
    document it as analysis-only context.
 4. **Resume evidence sources** — `ner`, `keybert`, `bulletpoints` are the channels.
    Confirm whether job-title/company lines deserve their own source.
+
+**Resolved:** evidence-floor value — the single `0.45` constant was replaced by
+per-source `EMISSION_FLOORS` (`bulletpoints 0.40`, `keybert/ner 0.50`) in Phase 2.5.

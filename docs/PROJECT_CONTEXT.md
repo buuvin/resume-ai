@@ -158,8 +158,13 @@ Compare the resume against the job description and identify:
 >   before NER and KeyBERT run, and title lines are tagged as their own source.
 >   Verified: 21 bullets, 7 titles, 0 wrap fragments, 0 headings; heading-cited
 >   evidence rows dropped 131 → 0.
-> - **Open.** The job-description requirement extractor only recognises one section
->   heading, so four of the five fixture postings yield no requirements at all.
+> - **Closed (Phase 3, `a73af2c`, `687e8eb`).** The job-description requirement
+>   extractor (`app/services/requirements.py`) splits each posting into required and
+>   preferred groups — sections mode under recognised headings, fallback harvest
+>   otherwise — and is validated against the fixture ground truth at recall 1.000 /
+>   precision 1.000 for both groups. All five fixtures now produce evidence (previously
+>   four of five returned zero rows); `parse_sections` no longer swallows requirement
+>   bullets that start with a heading word.
 > - **Resolved (Phase 2, `dcfc255`; calibrated Phase 2.5, `23ff9a2`).** The alignment
 >   machine now has per-source emission floors (`EMISSION_FLOORS = {"bulletpoints":
 >   0.40, "keybert": 0.50, "ner": 0.50}`, deliberately separate from the 0.45
@@ -239,7 +244,9 @@ requirement with partial evidence.
 > **Current status: stubbed.** `app/routes/analyze.py` currently produces a single
 > template string naming the top three missing skills, plus a placeholder explanation.
 > `ImprovementResult.rewritten_bullets` is always empty. Rebuilding this layer is
-> Phase 4 of the MVP plan.
+> Phase 4 of the MVP plan — the next step. The Phase 3 extractor already surfaces
+> required and preferred requirement groups with stored weights
+> (`AnalysisResult.preferred_requirements`), which this layer will consume.
 
 ---
 
@@ -433,11 +440,12 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    scoring
 8. Fix evidence density: per-source emission floors (bullets 0.40, KeyBERT/NER 0.50),
    re-measured slot effects — isolated-path real citations 70 → 90
+9. Correct the job-description requirement extraction: sections-mode + fallback
+   extractor validated at recall/precision 1.000 against fixture ground truth
 
 **Remaining for the MVP**
 
-9. — *currently here* — Correct the job-description requirement extraction
-10. Rebuild the optimization layer
+10. — *currently here* — Rebuild the optimization layer
 11. Add the LLM refinement layer with a working no-API-key default
 12. Surface evidence and recommendations in the frontend
 13. Align the documentation with the code
