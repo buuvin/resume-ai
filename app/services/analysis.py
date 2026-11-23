@@ -8,6 +8,7 @@ import numpy as np
 from app.models.schemas import (
     AlignmentEvidence,
     AnalysisResult,
+    RequirementItem,
 )
 
 ABBREVIATIONS = {
@@ -247,8 +248,24 @@ HEADING_VARIANTS = {
     "projects": ["projects", "personal projects", "project experience"],
     "education": ["education", "academic"],
     "certifications": ["certifications", "licenses"],
-    "requirements": ["requirements", "requirement", "qualifications", "qualification"],
-    "preferred": ["nice to have", "nice-to-have", "preferred", "nice to haves"],
+    "requirements": [
+        "requirements",
+        "requirement",
+        "qualifications",
+        "qualification",
+        "minimum qualifications",
+        "minimum qualification",
+        "must have",
+    ],
+    "preferred": [
+        "nice to have",
+        "nice-to-have",
+        "preferred",
+        "nice to haves",
+        "preferred qualifications",
+        "soft skills",
+        "bonus points",
+    ],
 }
 
 
@@ -257,7 +274,16 @@ def parse_sections(text: str):
 
     Returns an ordered dict-like mapping of section_name -> section_text.
     If no headings are detected, returns {'body': text}.
+
+    A line is a heading only when its normalised form *equals* a known
+    variant — never when it merely starts with one — and a line that
+    begins with a bullet marker is content whatever it says. Both rules
+    matter for job descriptions: prefix matching used to swallow
+    requirement bullets like "Experience with Git ..." and any line
+    starting with "skills ..." lost its content to the heading branch.
     """
+    from app.services.embeddings import BULLET_MARKER_PATTERN
+
     if not text or not text.strip():
         return {"body": ""}
 
@@ -277,17 +303,10 @@ def parse_sections(text: str):
                 sections[current] += "\n"
             continue
 
-        low = re.sub(r"[^\w\s]", " ", line).strip().lower()
         key = None
-        # detect heading if the line equals or starts with a known heading phrase
-        for variant, section_key in heading_lookup.items():
-            if (
-                low == variant
-                or low.startswith(variant + " ")
-                or low.startswith(variant + ":")
-            ):
-                key = section_key
-                break
+        if not BULLET_MARKER_PATTERN.match(line):
+            low = re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", line)).strip().lower()
+            key = heading_lookup.get(low)
 
         if key:
             current = key
@@ -633,6 +652,7 @@ def analyze_resume(
     jd_keyphrases: set[str] | None = None,
     supplemental_keyphrases: set[str] | None = None,
     bullet_similarity: object | None = None,
+    preferred_requirements: list[RequirementItem] | None = None,
 ):
     resume_entities = extract_domain_entities(resume)
     jd_entities = extract_domain_entities(job_description)
@@ -663,4 +683,5 @@ def analyze_resume(
         supplemental_entities=extract_domain_entities(supplemental),
         alignment_evidence=alignment_evidence,
         resume_title_lines=getattr(bullet_similarity, "resume_title_lines", []),
+        preferred_requirements=list(preferred_requirements or []),
     )

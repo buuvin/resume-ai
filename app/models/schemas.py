@@ -24,6 +24,12 @@ class AlignmentEvidence(BaseModel):
     alignment: float
     exact_match: bool
 
+class RequirementItem(BaseModel):
+    """A preferred requirement surfaced for display; weight is stored data."""
+
+    text: str
+    weight: float
+
 class AnalysisResult(BaseModel):
     matched_skills: list[str]
     underrepresented_skills: list[str]
@@ -37,6 +43,7 @@ class AnalysisResult(BaseModel):
     supplemental_entities: DomainEntities
     alignment_evidence: list[AlignmentEvidence] = Field(default_factory=list)
     resume_title_lines: list[str] = Field(default_factory=list)
+    preferred_requirements: list[RequirementItem] = Field(default_factory=list)
 
 class ImprovementResult(BaseModel):
     rewritten_summary: str = ""

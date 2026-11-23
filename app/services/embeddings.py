@@ -174,18 +174,26 @@ def compare_bullet_embeddings(
     top_n: int = 5,
     job_section_names: set[str] | None = None,
     job_minimum_words: int = 3,
+    job_bullets: list[str] | None = None,
 ) -> BulletSimilarityResult:
-    """Compare resume experience/project bullets with job requirement bullets."""
+    """Compare resume experience/project bullets with job requirement bullets.
+
+    ``job_bullets`` bypasses section extraction entirely: callers that
+    already extracted requirements (e.g. ``extract_requirements``) pass
+    them here so the similarity matrix and the alignment machine see the
+    exact same strings.
+    """
     resume_evidence = extract_evidence_lines(
         resume_text, {"experience", "projects"}
     )
     resume_bullets = resume_evidence["bulletpoints"]
     resume_title_lines = resume_evidence["titles"]
-    job_bullets = extract_bullet_points(
-        job_description_text,
-        job_section_names or {"requirements", "preferred", "skills"},
-        minimum_words=job_minimum_words,
-    )
+    if job_bullets is None:
+        job_bullets = extract_bullet_points(
+            job_description_text,
+            job_section_names or {"requirements", "preferred", "skills"},
+            minimum_words=job_minimum_words,
+        )
     if not resume_bullets or not job_bullets:
         return BulletSimilarityResult(
             resume_bullets=resume_bullets,

@@ -1,6 +1,11 @@
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from app.models.schemas import AnalyzeRequest, AnalyzeResponse, ImprovementResult
+from app.models.schemas import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    ImprovementResult,
+    RequirementItem,
+)
 from app.services.analysis import (
     analyze_resume,
     preprocess_for_semantic_extraction,
@@ -14,12 +19,14 @@ from app.services.embeddings import (
     print_bullet_similarity,
 )
 from app.services.ingestion import extract_upload_text
+from app.services.requirements import ExtractedRequirements, extract_requirements
 
 router = APIRouter()
 
 def build_response(resume_text: str, job_description_text: str, supplemental_text: str):
     keyphrases = {}
     bullet_similarity = None
+    extracted = ExtractedRequirements()
     try:
         documents = {
             "resume": resume_text,
@@ -37,22 +44,15 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
             keyphrases[document_name] = extract_keyphrases(
                 document_text, embedded_document=embedded_document
             )
-            # if embedded_document.lines:
-            #     print( 
-            #         f"[embeddings] {document_name} first sentence: "
-            #         f"{embedded_document.lines[0]}",
-            #         flush=True,
-            #     )
-            #     print(
-            #         f"[embeddings] {document_name} embedding: "
-            #         f"{embedded_document.embeddings[0]}",
-            #         flush=True,
-            #     )
+        # The extractor is the single source of truth for requirements:
+        # its required lines feed the similarity matrix, and the alignment
+        # machine reads them back from bullet_similarity, so both see the
+        # exact same strings.
+        extracted = extract_requirements(job_description_text)
         bullet_similarity = compare_bullet_embeddings(
             resume_text,
             job_description_text,
-            job_section_names={"requirements"},
-            job_minimum_words=1,
+            job_bullets=[item.text for item in extracted.required],
         )
         print_bullet_similarity(bullet_similarity)
     except ModuleNotFoundError as error:
@@ -70,6 +70,10 @@ def build_response(resume_text: str, job_description_text: str, supplemental_tex
         jd_keyphrases=set(keyphrases.get("job description", [])),
         supplemental_keyphrases=set(keyphrases.get("supplemental", [])),
         bullet_similarity=bullet_similarity,
+        preferred_requirements=[
+            RequirementItem(text=item.text, weight=item.weight)
+            for item in extracted.preferred
+        ],
     )
     write_alignment_evidence(analysis.alignment_evidence)
     write_resume_evidence(

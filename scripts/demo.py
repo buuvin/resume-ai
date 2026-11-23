@@ -145,11 +145,14 @@ def main() -> int:
     _print_table(rows)
 
     print(f"\nArtefacts written to {OUTPUT_DIR.relative_to(PROJECT_ROOT)}/")
-    print(
-        "Note: a score of 0.00 with 0 rows means the job-description requirement "
-        "extractor found no requirements for that posting. That is the known "
-        "Phase 3 gap, not a pipeline failure."
-    )
+    empty_cases = [row for row in rows if row["rows"] == 0]
+    if empty_cases:
+        print(
+            "Note: zero rows for "
+            + ", ".join(row["case_id"] for row in empty_cases)
+            + " means the requirement extractor found nothing for that "
+            "posting — check the heading map and the fallback harvest."
+        )
     return 0
 
 
