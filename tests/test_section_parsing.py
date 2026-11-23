@@ -25,6 +25,28 @@ def test_parse_sections_basic():
     assert "Python" in sections["summary"] or "python" in sections["summary"].lower()
 
 
+def test_parse_sections_never_treats_bullet_lines_as_headings():
+    # A bullet that starts with a heading word is content: before Phase 3
+    # the prefix match swallowed it (and lost its text) entirely.
+    text = "Experience\n- Experience with Git and CI/CD\n- Skills in demand"
+
+    sections = parse_sections(text)
+
+    assert list(sections) == ["experience"]
+    assert "- Experience with Git and CI/CD" in sections["experience"]
+    assert "- Skills in demand" in sections["experience"]
+
+
+def test_parse_sections_requires_whole_line_heading_match():
+    # Prefix matching removed: "Requirements for the role" is a sentence,
+    # not the "requirements" section.
+    sections = parse_sections("Requirements for the role\nPython")
+
+    assert list(sections) == ["summary"]
+    assert "Requirements for the role" in sections["summary"]
+    assert "Python" in sections["summary"]
+
+
 def test_strip_subheader_labels_keeps_value_side():
     text = """\
 Programming & Tools: Python, SQL, Git, Docker, Copilot
