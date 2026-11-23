@@ -89,5 +89,5 @@ Supported file types: `.txt`, `.md`, `.rtf`, `.pdf`, `.docx`.
 | `output/` | generated analysis artefacts (git-ignored) |
 | `scripts/` | environment bootstrap and demo runner |
 
-`CURRENT_GOALS.md` tracks the current state and the MVP plan.
-`PROJECT_CONTEXT.md` describes the architecture and the design philosophy.
+`docs/CURRENT_GOALS.md` tracks the current state and the MVP plan.
+`docs/PROJECT_CONTEXT.md` describes the architecture and the design philosophy.

@@ -9,7 +9,7 @@ Read this file for what is true *today*.
 
 ---
 
-## Immediate next steps — Phase 3
+## Immediate next steps — Phase 2.5, then Phase 3
 
 **Do this next. Phases 0, 1 and 2 are complete and committed.**
 
@@ -18,20 +18,53 @@ resume evidence pool. Phase 2 rebuilt the alignment machine: per-source similari
 matrices, NER restored as an evidence source, an emission floor at `0.50`,
 cross-source de-duplication, and mean-over-sub-requirements scoring.
 
-The analysis core is now sound. What is left is the **job-description requirement
-extractor** — see *Known gaps* #1 for the verified causes. Four of the five fixtures
-yield no requirements at all, and `Minimum Qualifications` is scored as if it were a
-requirement, so the product path still returns nothing for most real postings.
+### Phase 2.5 — evidence density (decisions locked, not yet executed)
 
-The step-by-step checklist is **Phase 3 — Finish the paused JD extraction** in the
-MVP plan below. The fixture file `input/job_description_cases.json` is the ground
-truth: validate the extractor directly against `expected_requirements`.
+Measured on the **isolated path** (the fixture test injects `expected_requirements`
+directly, so extraction is *not* the cause there): slot coverage is only 8–27 % across
+the five fixtures (65 qualifying pairs at the 0.50 floor). Causes, ranked:
+
+1. **Floor 0.50 sits above the data.** The bullet channel — the spec's primary matrix —
+   tops out at 0.42–0.56 across all five cases; only **2 pairs** in total reach 0.50.
+   At 0.40 there are **208** qualifying pairs (bullets 22, keybert 113, ner 73).
+   KeyBERT/NER ceilings are 0.715–1.0 — those channels are healthy at 0.50.
+2. **Slot inflation under R1:** each requirement decomposes into ~6–10 sub-requirement
+   slots, so means land ≈ 0.1 and everything classifies `missing`.
+3. Cross-source de-duplication is a minor contributor, not the driver.
+
+**Decisions:**
+
+- Replace `MINIMUM_ALIGNMENT_FLOOR = 0.50` with per-source floors:
+  `EMISSION_FLOORS = {"bulletpoints": 0.40, "keybert": 0.50, "ner": 0.50}` in
+  `app/services/analysis.py`; placeholder rows stay as they are (added after the floor).
+- Re-measure coverage/row counts on all five fixtures and **report the numbers before
+  changing any classification threshold** — `MATCHED_ALIGNMENT_THRESHOLD` (0.70) and
+  `UNDERREPRESENTED_ALIGNMENT_THRESHOLD` (0.45) stay untouched until reviewed.
+- If R1 slot dilution still dominates after the floor fix, bring options back with
+  measurements rather than improvising a threshold change.
+
+### Phase 3 — JD requirement extraction (planned)
+
+See the **Phase 3** checklist in the MVP plan below for the full steps. Decisions
+locked during planning:
+
+- Extractor returns **both** required and preferred groups with weights (weights are
+  stored data; consuming them in scoring is Phase 4); alignment consumes **required
+  only**; preferred surfaces as a new optional `AnalysisResult` field; both groups are
+  validated against `expected_requirements` / `expected_preferred` ground truth.
+- `parse_sections` hardening (bullet-marker lines never headings, whole-line matches
+  only) and an extended `HEADING_VARIANTS` map, plus a new
+  `app/services/requirements.py` with a fallback harvest derived from memverge's
+  ground truth.
+- The fixture test's ground-truth injection (`test_alignment_against_job_description_cases`)
+  stays untouched — analysis and extraction remain isolated from each other.
 
 ### Verification
 
 ```bash
 python -m pytest
 python scripts/demo.py
+ruff check .
 ```
 
 `scripts/demo.py` runs all five fixture job descriptions against the reference resume
@@ -66,8 +99,8 @@ requirements are degree boilerplate that the resume only partially matches.
 
 ## Current repository status
 
-- Branch `main`, tracking `origin/main`. Last commit: `6eec2cf`
-  *test: rewrite spec-contradicting alignment tests and harden fixtures*.
+- Branch `main`, tracking `origin/main`. Last commit: `85b7bb0`
+  *chore: move goal docs into docs/ and add AGENTS.md*.
 - **Phase 0 is complete** (`b014ec8`) — test collection unblocked, `en_core_web_sm`
   pinned into the Docker image, `pyproject.toml` added, whitespace-only diffs stripped.
 - **Phase 1 is complete** (`1ba0f94`, `68d999e`) — PDF line-wrap fragments are joined
@@ -402,6 +435,8 @@ Ordered by dependency. Phases 0–3 make the pipeline *correct*; 4–6 make it *
 
 ### Phase 3 — Finish the paused JD extraction (~2.5 h)
 
+*Prerequisite: Phase 2.5 (evidence-density fix) — see* Immediate next steps *above.*
+
 - [ ] New `app/services/requirements.py`.
 - [ ] Extend the heading map: *what you will do*, *what we are looking for*,
       *key responsibilities*, *minimum qualifications*, *preferred qualifications*,
@@ -410,9 +445,22 @@ Ordered by dependency. Phases 0–3 make the pipeline *correct*; 4–6 make it *
       heading; heading matches must be whole-line, not prefix.
 - [ ] Treat *Minimum Qualifications* / *Preferred Qualifications* as headings.
 - [ ] Fallback: harvest requirement-shaped lines when no requirements section exists.
-- [ ] Group requirements as `required` vs `preferred`, with weights.
-- [ ] Validate the extractor directly against `expected_requirements` in
-      `input/job_description_cases.json` — that file is the ground truth.
+      Derive the heuristic from memverge's ground truth (`ai_engineer_memverge` has no
+      recognized heading); gate it behind the precision test so it cannot reintroduce
+      junk requirements.
+- [ ] Group requirements as `required` vs `preferred`, with weights. *Decision: the
+      extractor returns both groups; alignment consumes **required only** (aligning
+      preferred too would double slot counts and worsen the R1 dilution); preferred
+      surfaces as a new optional `AnalysisResult` field; weights are stored data —
+      consuming them in scoring is Phase 4.*
+- [ ] Wire the route: required lines feed `compare_bullet_embeddings` through an
+      optional `job_bullets` parameter so alignment and the similarity matrix see
+      identical strings; drop `job_section_names={"requirements"}` from
+      `app/routes/analyze.py`.
+- [ ] Validate the extractor directly against `expected_requirements` **and**
+      `expected_preferred` in `input/job_description_cases.json` — that file is the
+      ground truth. *Measure recall/precision first, then pin thresholds.* The fixture
+      test's ground-truth injection stays untouched (analysis/extraction isolation).
 
 ### Phase 4 — Optimization layer (~3 h)
 

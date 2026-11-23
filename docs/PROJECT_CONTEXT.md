@@ -432,12 +432,15 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 **Remaining for the MVP**
 
-8. — *currently here* — Correct the job-description requirement extraction
-9. Rebuild the optimization layer
-10. Add the LLM refinement layer with a working no-API-key default
-11. Surface evidence and recommendations in the frontend
-12. Align the documentation with the code
-13. Produce the final Docker image for reproducibility
+8. — *currently here* — Fix evidence density: per-source emission floors
+   (bullets 0.40, KeyBERT/NER 0.50) and re-measured slot effects — the isolated path
+   cites only 8–27 % of sub-requirement slots at the uniform 0.50 floor
+9. Correct the job-description requirement extraction
+10. Rebuild the optimization layer
+11. Add the LLM refinement layer with a working no-API-key default
+12. Surface evidence and recommendations in the frontend
+13. Align the documentation with the code
+14. Produce the final Docker image for reproducibility
 
 ---
 
