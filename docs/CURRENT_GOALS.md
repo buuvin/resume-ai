@@ -9,39 +9,47 @@ Read this file for what is true *today*.
 
 ---
 
-## Immediate next steps — Phase 2.5, then Phase 3
+## Immediate next steps — Phase 3
 
-**Do this next. Phases 0, 1 and 2 are complete and committed.**
+**Do this next. Phases 0, 1, 2 and 2.5 are complete and committed.**
 
 Phase 0 (`b014ec8`) unblocked the build. Phase 1 (`1ba0f94`, `68d999e`) fixed the
 resume evidence pool. Phase 2 rebuilt the alignment machine: per-source similarity
-matrices, NER restored as an evidence source, an emission floor at `0.50`,
-cross-source de-duplication, and mean-over-sub-requirements scoring.
+matrices, NER restored as an evidence source, an emission floor, cross-source
+de-duplication, and mean-over-sub-requirements scoring. Phase 2.5 calibrated the
+floor per source after measurements showed the uniform 0.50 sat above the data.
 
-### Phase 2.5 — evidence density (decisions locked, not yet executed)
+### Phase 2.5 — evidence density — complete (`23ff9a2`, `82acb68`)
 
 Measured on the **isolated path** (the fixture test injects `expected_requirements`
-directly, so extraction is *not* the cause there): slot coverage is only 8–27 % across
-the five fixtures (65 qualifying pairs at the 0.50 floor). Causes, ranked:
+directly, so extraction is *not* the cause there): slot coverage was only 8–27 %
+across the five fixtures (65 qualifying pairs at the uniform 0.50 floor). Causes,
+ranked:
 
-1. **Floor 0.50 sits above the data.** The bullet channel — the spec's primary matrix —
-   tops out at 0.42–0.56 across all five cases; only **2 pairs** in total reach 0.50.
+1. **Floor 0.50 sat above the data.** The bullet channel — the spec's primary matrix —
+   tops out at 0.42–0.56 across all five cases; only **2 pairs** in total reached 0.50.
    At 0.40 there are **208** qualifying pairs (bullets 22, keybert 113, ner 73).
    KeyBERT/NER ceilings are 0.715–1.0 — those channels are healthy at 0.50.
 2. **Slot inflation under R1:** each requirement decomposes into ~6–10 sub-requirement
    slots, so means land ≈ 0.1 and everything classifies `missing`.
 3. Cross-source de-duplication is a minor contributor, not the driver.
 
-**Decisions:**
+**Outcome** — `MINIMUM_ALIGNMENT_FLOOR = 0.50` replaced by
+`EMISSION_FLOORS = {"bulletpoints": 0.40, "keybert": 0.50, "ner": 0.50}` in
+`app/services/analysis.py`; classification thresholds (0.70 / 0.45) untouched.
+Placeholder rows unchanged (added after the floor).
 
-- Replace `MINIMUM_ALIGNMENT_FLOOR = 0.50` with per-source floors:
-  `EMISSION_FLOORS = {"bulletpoints": 0.40, "keybert": 0.50, "ner": 0.50}` in
-  `app/services/analysis.py`; placeholder rows stay as they are (added after the floor).
-- Re-measure coverage/row counts on all five fixtures and **report the numbers before
-  changing any classification threshold** — `MATCHED_ALIGNMENT_THRESHOLD` (0.70) and
-  `UNDERREPRESENTED_ALIGNMENT_THRESHOLD` (0.45) stay untouched until reviewed.
-- If R1 slot dilution still dominates after the floor fix, bring options back with
-  measurements rather than improvising a threshold change.
+| metric (isolated path, 5 fixtures) | before | after |
+| --- | --- | --- |
+| slots with evidence | 50 / 286 (17.5 %) | 62 / 286 (21.7 %) |
+| per-case coverage | 8–27 % | 10–34 % |
+| real citation rows | 70 | 90 (bulletpoints 22, keybert 29, ner 39) |
+| demo `data_scientist_altera` | 33 rows, 0.04 | 33 rows, 0.06 |
+
+The 22 bullet rows match the predicted qualifying-pair count at 0.40 exactly (the
+channel contributed ≤ 2 rows before). **Still open, needs a decision with numbers:**
+R1 slot dilution (cause 2) remains — most requirement means still classify `missing`.
+Options will be brought back with measurements before any threshold change.
 
 ### Phase 3 — JD requirement extraction (planned)
 
@@ -99,8 +107,8 @@ requirements are degree boilerplate that the resume only partially matches.
 
 ## Current repository status
 
-- Branch `main`, tracking `origin/main`. Last commit: `85b7bb0`
-  *chore: move goal docs into docs/ and add AGENTS.md*.
+- Branch `main`, tracking `origin/main`. Last commit: `82acb68`
+  *test: pin per-source emission floors*.
 - **Phase 0 is complete** (`b014ec8`) — test collection unblocked, `en_core_web_sm`
   pinned into the Docker image, `pyproject.toml` added, whitespace-only diffs stripped.
 - **Phase 1 is complete** (`1ba0f94`, `68d999e`) — PDF line-wrap fragments are joined
@@ -109,12 +117,17 @@ requirements are degree boilerplate that the resume only partially matches.
   Verified: 21 bullets, 7 titles, 0 wrap fragments, 0 headings in the evidence pool;
   heading-cited rows dropped 131 → 0.
 - **Phase 2 is complete** (`dcfc255`, `6eec2cf`) — per-source similarity matrices, NER
-  restored as an evidence source, `MINIMUM_ALIGNMENT_FLOOR = 0.50`, cross-source
-  de-duplication within a requirement, and mean-over-sub-requirements scoring.
+  restored as an evidence source, an emission floor, cross-source de-duplication
+  within a requirement, and mean-over-sub-requirements scoring.
   Verified: `data_scientist_altera` rows 280 → 33 (3 real citations, the rest
   placeholders), fixture test passes for all five cases with ground-truth
   requirements.
-- **41 tests pass** in the conda development environment.
+- **Phase 2.5 is complete** (`23ff9a2`, `82acb68`) — per-source emission floors
+  (`bulletpoints 0.40`, `keybert/ner 0.50`) replace the uniform 0.50. Verified on the
+  isolated path: slots with evidence 50 → 62 of 286, real citation rows 70 → 90
+  (bulletpoints 0 → 22), per-case coverage 8–27 % → 10–34 %; classification
+  thresholds (0.70 / 0.45) deliberately untouched.
+- **42 tests pass** in the conda development environment.
 - **The development environment is a conda env, not Docker.** See *Environment setup*.
   The Docker build is reserved for the final MVP (Phase 9).
 - The remaining substantive work is **Phase 3** — see *Immediate next steps* at the top
@@ -144,10 +157,10 @@ requirements are degree boilerplate that the resume only partially matches.
   synonym canonicalisation map (`SYNONYMS`).
 - **Alignment machine** (`alignment_machine`): builds one cosine similarity matrix per
   source and compares the JD side of a source only against the resume side of that
-  same source (bullets ↔ bullets, KeyBERT ↔ KeyBERT, NER ↔ NER). Rows below
-  `MINIMUM_ALIGNMENT_FLOOR` (0.50) are never emitted, evidence is de-duplicated
-  within a requirement across sources, and every sub-requirement without a surviving
-  citation gets a placeholder row (`evidence=""`).
+  same source (bullets ↔ bullets, KeyBERT ↔ KeyBERT, NER ↔ NER). Rows below their
+  source's `EMISSION_FLOORS` entry (bulletpoints 0.40, keybert/ner 0.50) are never
+  emitted, evidence is de-duplicated within a requirement across sources, and every
+  sub-requirement without a surviving citation gets a placeholder row (`evidence=""`).
 - **Scoring** (`_summarize_alignment`): best alignment per sub-requirement → mean
   across *all* of a requirement's sub-requirements (uncovered ones count as `0.0`) →
   `matched` (≥ 0.70), `underrepresented` (0.45–0.70), `missing` (< 0.45);
@@ -267,11 +280,15 @@ best score per requirement is a **max over ~56 candidates**, the three-way
 classification is close to degenerate: across the five fixtures `matched` is 0–2,
 `underrepresented` is 2–9, and `missing` is almost never reached.
 
-**✅ RESOLVED in Phase 2** (`dcfc255`). `MINIMUM_ALIGNMENT_FLOOR = 0.50` drops rows
-below it (separate from the 0.45 classification threshold), and a requirement's score
-is now the mean of the best alignment across *all* its sub-requirements, with
-uncovered sub-requirements counting as `0.0`. Rows for `data_scientist_altera`
-280 → 33; only 3 of those clear the floor as real citations.
+**✅ RESOLVED in Phase 2** (`dcfc255`). An emission floor drops rows below it
+(separate from the 0.45 classification threshold), and a requirement's score is now
+the mean of the best alignment across *all* its sub-requirements, with uncovered
+sub-requirements counting as `0.0`. Rows for `data_scientist_altera` 280 → 33.
+**Calibrated in Phase 2.5** (`23ff9a2`): the floor is per source —
+`EMISSION_FLOORS = {"bulletpoints": 0.40, "keybert": 0.50, "ner": 0.50}` — because
+the uniform 0.50 sat above the bullet channel's measured range (0.42–0.56); isolated-
+path real citations went 70 → 90. The R1 slot-dilution half of this gap (cause 2
+above) is **still open** and needs a decision backed by numbers.
 
 ### 4. NER was removed as an evidence source but is still specified — resolved
 
@@ -416,7 +433,8 @@ Ordered by dependency. Phases 0–3 make the pipeline *correct*; 4–6 make it *
       The test now asserts NER rows are emitted with `source="ner"`.
 - [x] Restore the minimum alignment floor so irrelevant rows are never emitted.
       `MINIMUM_ALIGNMENT_FLOOR = 0.50`, separate from the 0.45 classification
-      threshold. A row at exactly 0.50 is kept; 0.493 is not.
+      threshold. A row at exactly 0.50 is kept; 0.493 is not. *Superseded in Phase
+      2.5 (`23ff9a2`) by per-source `EMISSION_FLOORS` — see* Immediate next steps.
 - [x] De-duplicate evidence within a requirement across sources, on the normalised
       evidence string with a fixed source-priority tie-break.
 - [x] Exclude heading-like evidence strings from matching. *Done ahead of Phase 2 via

@@ -160,11 +160,13 @@ Compare the resume against the job description and identify:
 >   evidence rows dropped 131 → 0.
 > - **Open.** The job-description requirement extractor only recognises one section
 >   heading, so four of the five fixture postings yield no requirements at all.
-> - **Resolved (Phase 2, `dcfc255`).** The alignment machine now has an emission
->   floor (`MINIMUM_ALIGNMENT_FLOOR = 0.50`, deliberately separate from the 0.45
+> - **Resolved (Phase 2, `dcfc255`; calibrated Phase 2.5, `23ff9a2`).** The alignment
+>   machine now has per-source emission floors (`EMISSION_FLOORS = {"bulletpoints":
+>   0.40, "keybert": 0.50, "ner": 0.50}`, deliberately separate from the 0.45
 >   classification threshold) and scores each requirement as the mean of the best
 >   alignment across *all* its sub-requirements instead of max-over-many, so the
->   matched / underrepresented / missing split reflects real coverage.
+>   matched / underrepresented / missing split reflects real coverage. The R1
+>   slot-dilution effect (~6–10 sub-requirement slots per requirement) remains open.
 >
 > **Entity extraction is regex-based**, matching against a hand-maintained taxonomy of
 > languages, frameworks, platforms, tools, databases and concepts. It is not spaCy NER,
@@ -429,13 +431,12 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 7. Finish the alignment machine: per-source matrices, NER restored as an evidence
    source, evidence floor, cross-source de-duplication, mean-over-sub-requirements
    scoring
+8. Fix evidence density: per-source emission floors (bullets 0.40, KeyBERT/NER 0.50),
+   re-measured slot effects — isolated-path real citations 70 → 90
 
 **Remaining for the MVP**
 
-8. — *currently here* — Fix evidence density: per-source emission floors
-   (bullets 0.40, KeyBERT/NER 0.50) and re-measured slot effects — the isolated path
-   cites only 8–27 % of sub-requirement slots at the uniform 0.50 floor
-9. Correct the job-description requirement extraction
+9. — *currently here* — Correct the job-description requirement extraction
 10. Rebuild the optimization layer
 11. Add the LLM refinement layer with a working no-API-key default
 12. Surface evidence and recommendations in the frontend
