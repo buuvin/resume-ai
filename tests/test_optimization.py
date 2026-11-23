@@ -76,10 +76,13 @@ def test_alignment_machine_separates_sources(monkeypatch):
         "app.services.embeddings.embed_document",
         fake_embed_document,
     )
-    # Drop the emission floor so a 0.0-alignment row survives: this test is
-    # about source separation, not emission strength (the floor has its
-    # own test below).
-    monkeypatch.setattr("app.services.analysis.MINIMUM_ALIGNMENT_FLOOR", 0.0)
+    # Drop the emission floors so a 0.0-alignment row survives: this test
+    # is about source separation, not emission strength (the floors have
+    # their own tests below).
+    monkeypatch.setattr(
+        "app.services.analysis.EMISSION_FLOORS",
+        {"bulletpoints": 0.0, "keybert": 0.0, "ner": 0.0},
+    )
 
     alignments = alignment_machine(
         {"keybert": ["PostgreSQL"], "bulletpoints": ["AWS"]},
@@ -204,6 +207,37 @@ def test_alignment_machine_drops_rows_below_floor(monkeypatch):
         ["Requirement"],
     )
     assert len(capped) == 10
+
+
+def test_alignment_machine_applies_per_source_floors(monkeypatch):
+    class FakeEmbedding:
+        def __init__(self, vectors):
+            self.embeddings = vectors
+
+    # Both sources offer a 0.45 match. The bullet floor (0.40) keeps it;
+    # the KeyBERT floor (0.50) drops it. Requirement is the JD side of
+    # both channels (the decomposition falls back to the requirement), so
+    # its vector is [1.0, 0.0] and each dot product is just the evidence
+    # vector's first component.
+    vectors = {
+        "Requirement": [1.0, 0.0],
+        "Bullet match": [0.45, 0.893],
+        "Phrase match": [0.45, 0.893],
+    }
+
+    monkeypatch.setattr(
+        "app.services.embeddings.embed_document",
+        lambda text: FakeEmbedding([vectors[item] for item in text.split("\n")]),
+    )
+
+    alignments = alignment_machine(
+        {"bulletpoints": ["Bullet match"], "keybert": ["Phrase match"]},
+        ["Requirement"],
+    )
+
+    assert [(item.source, item.evidence, item.alignment) for item in alignments] == [
+        ("bulletpoints", "Bullet match", 0.45)
+    ]
 
 
 def test_decompose_requirements_combines_keybert_and_ner(monkeypatch):
