@@ -8,7 +8,7 @@ Coding Rules:
 
 Type hints required
 Use Ruff formatting
-Use uv package manager
+Environment: conda env `resume-ai` (created from `environment.yml`); dependencies live in `requirements.txt` — never uv
 Avoid adding dependencies
 Behavior:
 
