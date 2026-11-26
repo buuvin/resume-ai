@@ -115,6 +115,15 @@ SYNONYMS = {
 
 MATCHED_ALIGNMENT_THRESHOLD = 0.70
 UNDERREPRESENTED_ALIGNMENT_THRESHOLD = 0.45
+# R1 slot-dilution decision (scripts/score_experiment.py, 20 hand labels):
+# a requirement's score is mean(best alignment over COVERED slots) *
+# coverage^COVERAGE_ALPHA. alpha=1 was the old all-slot mean (uncovered
+# slots punished the score; 9/10 present requirements misclassified as
+# missing), alpha=0 lets one lucky match carry a whole requirement (9/10
+# absent requirements leaked). alpha=0.3 fixed 3 of the 9 dilution
+# failures while keeping absent requirements mostly missing (5/10).
+# A requirement with zero covered slots still scores 0.0.
+COVERAGE_ALPHA = 0.3
 # Emission floor per source: rows below their source's floor are never
 # cited. Deliberately separate from the classification thresholds above —
 # 0.45 decides how a requirement is labelled, the floor decides whether a
@@ -599,29 +608,48 @@ def _summarize_alignment(
 ) -> tuple[list[str], list[str], list[str], float]:
     """Summarize semantic evidence without falling back to token extraction.
 
-    A requirement's score is the mean of the best alignment across *all*
-    of its sub-requirements; a sub-requirement with no cited evidence
-    (a placeholder row) counts as ``0.0``. The overall score is the mean
-    of those requirement scores.
+    A requirement's score is the mean best alignment across its *covered*
+    sub-requirements (those with cited evidence), discounted by
+    ``coverage ** COVERAGE_ALPHA`` where coverage is the fraction of its
+    sub-requirements that are covered. A placeholder row (no cited
+    evidence) contributes to the coverage denominator only; a requirement
+    with zero covered sub-requirements scores ``0.0``. The overall score
+    is the mean of those requirement scores.
     """
     best_alignment_by_sub_requirement: dict[tuple[str, str], float] = {}
+    covered_slots: set[tuple[str, str]] = set()
     for item in alignment_evidence:
         key = (item.requirement, item.sub_requirement)
         best_alignment_by_sub_requirement[key] = max(
             best_alignment_by_sub_requirement.get(key, 0.0),
             item.alignment,
         )
+        if item.evidence.strip():
+            covered_slots.add(key)
 
-    alignments_by_requirement: dict[str, list[float]] = {}
-    for (requirement, _sub_requirement), alignment in (
+    slots_by_requirement: dict[str, list[tuple[str, float]]] = {}
+    for (requirement, sub_requirement), alignment in (
         best_alignment_by_sub_requirement.items()
     ):
-        alignments_by_requirement.setdefault(requirement, []).append(alignment)
+        slots_by_requirement.setdefault(requirement, []).append(
+            (sub_requirement, alignment)
+        )
 
-    best_alignment_by_requirement = {
-        requirement: sum(alignments) / len(alignments)
-        for requirement, alignments in alignments_by_requirement.items()
-    }
+    best_alignment_by_requirement: dict[str, float] = {}
+    for requirement, slots in slots_by_requirement.items():
+        covered_scores = [
+            alignment
+            for sub_requirement, alignment in slots
+            if (requirement, sub_requirement) in covered_slots
+        ]
+        if not covered_scores:
+            best_alignment_by_requirement[requirement] = 0.0
+            continue
+        coverage = len(covered_scores) / len(slots)
+        covered_mean = sum(covered_scores) / len(covered_scores)
+        best_alignment_by_requirement[requirement] = (
+            covered_mean * coverage**COVERAGE_ALPHA
+        )
 
     matched = {
         requirement

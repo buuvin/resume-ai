@@ -44,13 +44,45 @@ produces evidence for **all five fixtures** (previously 4 of 5 returned zero row
 | `machine_learning_engineer_rzr_global` | 0 rows | 97 rows, 0.24 |
 | `ai_data_science_engineer_i` | 0 rows | 86 rows, 0.14 |
 
-### Open decision before Phase 4 — R1 slot dilution
+### R1 slot dilution — resolved (C3 scoring)
 
-Scores remain low (0.09–0.24) because of the Phase 2.5 finding (cause 2): each
-requirement decomposes into ~6–10 sub-requirement slots, so R1 means land at
-≈ 0.1–0.2 and most requirements classify `missing`. Candidate options (top-k mean
-instead of full mean, slot grouping, threshold changes) will be brought back
-**with measurements** before anything changes.
+Scores were low (0.09–0.24) because of the Phase 2.5 finding (cause 2): each
+requirement decomposes into ~6–10 sub-requirement slots, so the all-slot mean
+landed at ≈ 0.1–0.2 and most requirements classified `missing` even with correct
+evidence. Decided with measurements in `scripts/score_experiment.py` (arms A/B/
+C3/C5/D2/D3 over **20 hand labels**, 10 present / 10 absent, embedded in the
+script with reasons):
+
+- **Adopted: C3** — `score = mean(best over covered slots) × coverage^0.3`,
+  zero covered slots still `0.0`. Implemented as `COVERAGE_ALPHA = 0.3` in
+  `_summarize_alignment` (`app/services/analysis.py`).
+- Label accuracy: A 10/20, C5 10/20 (both by classifying almost everything
+  `missing` — 9/10 present requirements misclassified), **C3 9/20** with the
+  best failure balance (6 present→missing, 5 absent→not-missing), B (α=0) 9/20
+  but unusable (9/10 absent requirements leaked, one at `matched` 0.86), D2 7/20,
+  D3 8/20. No arm separates present from absent better than ≈55 % on current
+  features — C3 is the best of a mediocre field, not a solved problem.
+- Demo scores after C3: 0.49 / 0.34 / 0.21 / 0.46 / 0.44 (was 0.23 / 0.10 /
+  0.09 / 0.24 / 0.14); matched counts 1/0/1/1/0 (was 0/0/0/0/0).
+
+**Measurement limitation (agreed 2026-11-26):** the calibration set runs
+**one resume — a new-grad resume — against all five fixture JDs**. Consequences:
+labels reflect what *this* resume can evidence, so "present/absent" judgments
+are biased toward new-grad-profile requirements, the absent class is mostly
+"senior/production skills a new grad wouldn't have", and the 20 labels are not
+a representative sample of real screening decisions. Any of: more resumes
+(including a senior one), more JDs, or a re-label pass on a resume with
+deliberate gaps, would likely change the winner between A/C3/C5. Re-run
+`scripts/score_experiment.py` (edit `LABELS`) before trusting C3 elsewhere.
+
+Two scoring-independent gaps surfaced by the same experiment (no scoring rule
+can fix these — follow-ups):
+
+1. **Matcher/decomposition holes:** `memverge[9]` ("Evidence that you build
+   things…") and `memverge[7]` ("LLMs, APIs, prompting, embeddings, RAG…") have
+   **0/9 covered slots** — every arm scores them `0.00`.
+2. **Generic slots create false bests:** an absent cloud requirement scores
+   `matched` (0.86) via a generic "machine learning models" slot.
 
 ### Phase 2.5 — evidence density — complete (`23ff9a2`, `82acb68`)
 
@@ -80,8 +112,8 @@ Placeholder rows unchanged (added after the floor).
 | demo `data_scientist_altera` | 33 rows, 0.04 | 33 rows, 0.06 |
 
 The 22 bullet rows match the predicted qualifying-pair count at 0.40 exactly (the
-channel contributed ≤ 2 rows before). The R1 dilution half of the finding remains
-open — see *Open decision* above.
+channel contributed ≤ 2 rows before). The R1 dilution half of the finding was
+resolved later with the C3 rule — see *R1 slot dilution — resolved* above.
 
 ### Verification
 
@@ -92,9 +124,9 @@ ruff check .
 ```
 
 `scripts/demo.py` runs all five fixture job descriptions against the reference resume
-and prints the summary table. All five rows are non-zero since Phase 3; scores stay
-in the 0.09–0.24 range because of the open R1 dilution question above, not because
-of missing requirements.
+and prints the summary table. All five rows are non-zero since Phase 3; scores are
+0.21–0.49 under the C3 rule (see *R1 slot dilution — resolved* above), not the
+0.09–0.24 of the old all-slot mean.
 
 ---
 
@@ -148,11 +180,12 @@ of missing requirements.
   against fixture ground truth at recall 1.000 / precision 1.000 for both groups;
   `parse_sections` hardened so bullet lines are never headings. Verified: demo 5/5
   non-zero (previously 4 of 5 at zero rows).
-- **50 tests pass** in the conda development environment.
+- **51 tests pass** in the conda development environment.
 - **The development environment is a conda env, not Docker.** See *Environment setup*.
   The Docker build is reserved for the final MVP (Phase 9).
 - The remaining substantive work is **Phase 4** — see *Immediate next steps* at the top
-  of this file. The one open decision (R1 slot dilution) is listed under *Open decisions*.
+  of this file. The R1 slot-dilution decision is **resolved** (C3 scoring); remaining
+  open decisions are listed under *Open decisions*.
 
 ---
 
@@ -231,12 +264,12 @@ chips, KeyBERT phrases, domain entities, and a stub improvement summary.
 
 ### Tests
 
-Five modules, 50 tests, covering the endpoint, upload ingestion, section parsing,
+Five modules, 51 tests, covering the endpoint, upload ingestion, section parsing,
 heading/subheader preprocessing, embeddings, KeyBERT wiring, bullet joining, normalisation,
 alignment-machine behaviour, a fixture-driven run over all five job descriptions, and the
 requirement extractor's recall/precision against that same fixture's ground truth.
 
-> All 50 tests pass as of Phase 3 (verified 2026-11-23).
+> All 51 tests pass as of the C3 scoring change (verified 2026-11-26).
 
 ---
 
@@ -272,8 +305,10 @@ Phase 3:
 | `machine_learning_engineer_rzr_global` | 97 | 0.24 |
 | `ai_data_science_engineer_i` | 86 | 0.14 |
 
-The scores stay low (0.09–0.24) because of R1 slot dilution — an open decision, not an
-extraction failure.
+The scores above (0.09–0.24) were produced under the old all-slot mean. The C3
+rule (`mean(covered) × coverage^0.3`) replaced it; re-run `scripts/demo.py` for
+current numbers (0.21–0.49 at the time of writing). The low scores were an open
+decision, not an extraction failure — the decision is now resolved above.
 
 <details>
 <summary>Original diagnosis (superseded, kept for context)</summary>
@@ -343,7 +378,8 @@ sub-requirements counting as `0.0`. Rows for `data_scientist_altera` 280 → 33.
 `EMISSION_FLOORS = {"bulletpoints": 0.40, "keybert": 0.50, "ner": 0.50}` — because
 the uniform 0.50 sat above the bullet channel's measured range (0.42–0.56); isolated-
 path real citations went 70 → 90. The R1 slot-dilution half of this gap (cause 2
-above) is **still open** and needs a decision backed by numbers.
+above) was **resolved after this phase** with the C3 rule — see *R1 slot dilution
+— resolved* at the top of this file.
 
 ### 4. NER was removed as an evidence source but is still specified — resolved
 
@@ -385,10 +421,11 @@ anything outside the taxonomy.
 ## Design spec: the alignment machine
 
 **✅ Implemented in Phase 2** (`dcfc255`). This is the design as stated; the code now
-matches it. Two decisions were resolved during implementation: the emission floor is
-`0.50` (higher than the 0.45 classification threshold, as the spec asks), and the
-scoring mean runs over *all* sub-requirements with uncovered ones counting as `0.0`
-— the explicit "scores `0.0`" case below then holds trivially.
+matches it, with one later amendment: the scoring rule was replaced by the C3 rule
+(see *R1 slot dilution — resolved* at the top) — `mean(covered) × coverage^0.3`
+instead of the all-slot mean. The emission floor decision is unchanged: per-source
+`EMISSION_FLOORS` since Phase 2.5 (higher than the 0.45 classification threshold,
+as the spec asks).
 
 **Inputs**
 
@@ -433,13 +470,17 @@ scoring mean runs over *all* sub-requirements with uncovered ones counting as `0
 - Evidence below the minimum alignment threshold is not emitted.
 - Scores are deterministic and derived only from the cited evidence.
 
-**Scoring rule (current decision)**
+**Scoring rule (current decision — C3)**
 
-A requirement's score is the **mean of the best alignment across its sub-requirements**,
-computed over evidence that passes the floor, with cross-source de-duplication applied
-first. If no sub-requirement has qualifying evidence the requirement scores `0.0`.
-Thresholds: `MATCHED_ALIGNMENT_THRESHOLD = 0.70`,
-`UNDERREPRESENTED_ALIGNMENT_THRESHOLD = 0.45`.
+A requirement's score is the **mean of the best alignment across its *covered*
+sub-requirements (those with cited evidence), multiplied by `coverage^0.3`**
+(`COVERAGE_ALPHA = 0.3`), where coverage is the fraction of sub-requirements with
+cited evidence. Uncovered (placeholder) slots count only in the coverage
+denominator, never as `0.0` in the mean; a requirement with zero covered slots
+scores `0.0`. Evidence must pass the source's emission floor, with cross-source
+de-duplication applied first. Thresholds: `MATCHED_ALIGNMENT_THRESHOLD = 0.70`,
+`UNDERREPRESENTED_ALIGNMENT_THRESHOLD = 0.45`. *Chosen over five arms on 20 hand
+labels — measurements and limitations in* R1 slot dilution — resolved.
 
 ---
 
@@ -499,7 +540,8 @@ Ordered by dependency. Phases 0–3 make the pipeline *correct*; 4–6 make it *
       floor, not source filtering.*
 - [x] Apply the scoring rule above (mean over sub-requirements, floor applied).
       Uncovered sub-requirements count as `0.0` via placeholder rows, so the
-      denominator is every sub-requirement.
+      denominator is every sub-requirement. *Superseded by the C3 rule — covered-
+      only mean × `coverage^0.3` — see* R1 slot dilution *at the top.*
 - [x] Strengthen the fixture test: assert requirement coverage, row volume, and that
       no cited evidence is a heading or a wrap fragment. *Now also asserts at least
       one real citation per case (placeholders made the old non-empty check
@@ -707,11 +749,11 @@ decisions (root `Dockerfile` vs `.devcontainer/`, non-root user, verification).
 
 ## Open decisions
 
-1. **R1 slot dilution (blocks Phase 4 design)** — each requirement decomposes into
-   ~6–10 sub-requirement slots, so R1 means land at ≈ 0.09–0.24 and most requirements
-   classify `missing` even with correct evidence. Candidates: top-k mean instead of a
-   full mean, slot grouping, or threshold changes. *Must be decided with measurements —
-   see* Immediate next steps *above.*
+1. ~~**R1 slot dilution (blocks Phase 4 design)**~~ — **✅ RESOLVED.** Adopted
+   **C3** (`mean(covered) × coverage^0.3`, `COVERAGE_ALPHA = 0.3`) over 20 hand
+   labels in `scripts/score_experiment.py`; measurements, limitations (single
+   new-grad resume) and the two matcher gaps recorded under *R1 slot dilution —
+   resolved* at the top of this file.
 2. **Preferred requirements** — score them at a lower weight (extractor stores 0.5), or
    exclude them from the score and surface them only in the optimization queue? Each
    fixture has 1–22 `expected_preferred` entries, so this materially changes the

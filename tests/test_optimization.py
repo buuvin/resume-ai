@@ -304,7 +304,7 @@ def test_alignment_machine_dedupes_evidence_across_sources_within_requirement(
     assert sum(1 for item in alignments if not item.evidence) == 2
 
 
-def test_summarize_alignment_scores_mean_of_best_sub_requirements():
+def test_summarize_alignment_scores_covered_slots_with_coverage_discount():
     def row(requirement, sub_requirement, alignment, evidence):
         return AlignmentEvidence(
             source="keybert",
@@ -320,7 +320,8 @@ def test_summarize_alignment_scores_mean_of_best_sub_requirements():
         row("Requirement A", "part one", 0.9, "evidence one"),
         row("Requirement A", "part one", 0.6, "evidence two"),
         row("Requirement A", "part two", 0.8, "evidence three"),
-        # Placeholder: no cited evidence for this sub-requirement -> 0.0.
+        # Placeholder: no cited evidence for this sub-requirement — it
+        # only counts against coverage, never as a 0.0 in the mean.
         row("Requirement A", "part three", 0.0, ""),
         # Single-sub-requirement requirements: 0.95 -> matched.
         row("Requirement B", "Requirement B", 0.95, "solid match"),
@@ -330,13 +331,42 @@ def test_summarize_alignment_scores_mean_of_best_sub_requirements():
 
     matched, underrepresented, missing, score = _summarize_alignment(evidence)
 
-    # R1: mean over ALL sub-requirements, uncovered ones count as 0.0.
-    # Requirement A = (0.9 + 0.8 + 0.0) / 3 = 0.5667 -> underrepresented.
-    assert matched == ["Requirement B"]
-    assert underrepresented == ["Requirement A"]
+    # C3: mean over COVERED sub-requirements * coverage^0.3.
+    # Requirement A = 0.85 * (2/3)^0.3 = 0.7527 -> matched.
+    # Requirement B = 0.95 -> matched. Requirement C = 0.0 -> missing.
+    assert matched == ["Requirement A", "Requirement B"]
+    assert underrepresented == []
     assert missing == ["Requirement C"]
-    # Overall = mean of (0.5667, 0.95, 0.0) = 0.5056 -> 0.51.
-    assert score == 0.51
+    # Overall = mean of (0.7527, 0.95, 0.0) = 0.5676 -> 0.57.
+    assert score == 0.57
+
+
+def test_summarize_alignment_penalizes_sparse_coverage_not_evidence():
+    def row(sub_requirement, alignment, evidence):
+        return AlignmentEvidence(
+            source="keybert",
+            requirement="Requirement",
+            sub_requirement=sub_requirement,
+            evidence=evidence,
+            alignment=alignment,
+            exact_match=False,
+        )
+
+    # One strong match out of ten slots: the old all-slot mean scored
+    # 0.09 (missing); the coverage discount scores 0.9 * 0.1^0.3 = 0.451
+    # -> underrepresented instead.
+    sparse = [row("only match", 0.9, "evidence")] + [
+        row(f"slot {i}", 0.0, "") for i in range(9)
+    ]
+    _, underrepresented, missing, score = _summarize_alignment(sparse)
+    assert score == 0.45
+    assert underrepresented == ["Requirement"]
+    assert missing == []
+
+    # Zero covered slots stays 0.0 — coverage^alpha must not invent a
+    # score from nothing.
+    _, _, missing, score = _summarize_alignment([row("slot", 0.0, "")])
+    assert (score, missing) == (0.0, ["Requirement"])
 
 
 def test_write_alignment_evidence_groups_all_matches_by_requirement(tmp_path):
